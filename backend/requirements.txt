@@ -23,7 +23,7 @@ pydantic-to-typescript==2.0.0
 pydantic_core==2.46.4
 Pygments==2.20.0
 pytest==9.0.3
-PyYAML-ft==8.0.0
+PyYAML>=6.0
 radon==6.0.1
 rich==15.0.0
 setproctitle==1.3.7

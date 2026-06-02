@@ -1,0 +1,13 @@
+{
+  "name": "meu-projeto-credito-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scripts de orquestração para o monorepo",
+  "scripts": {
+    "install:all": "npm install --prefix frontend/host-shell && npm install --prefix frontend/remote-estudantil && npm install --prefix frontend/remote-imobiliario",
+    "dev:host": "cd frontend/host-shell && npm run dev",
+    "dev:estudantil": "cd frontend/remote-estudantil && npm run dev",
+    "dev:imobiliario": "cd frontend/remote-imobiliario && npm run dev",
+    "build:all": "npm run build --prefix frontend/host-shell && npm run build --prefix frontend/remote-estudantil && npm run build --prefix frontend/remote-imobiliario"
+  }
+}
