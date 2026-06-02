@@ -1,0 +1,99 @@
+# ==============================================================================
+# 1. VARIÁVEIS DE AMBIENTE E SEGURANÇA (Nunca suba isso!)
+# ==============================================================================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+credentials.json
+secrets.json
+
+# ==============================================================================
+# 2. ARQUIVOS DO SISTEMA OPERACIONAL E EDITORES
+# ==============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDEs (VS Code, PyCharm, IntelliJ, etc.)
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sln
+*.user
+
+# ==============================================================================
+# 3. BACKEND (Python / FastAPI)
+# ==============================================================================
+# Ambientes virtuais
+backend/venv/
+backend/.venv/
+backend/env/
+backend/ENV/
+
+# Bytecode e cache do Python
+backend/__pycache__/
+backend/**/*.py[cod]
+backend/*$py.class
+
+# Testes e Cobertura (pytest, coverage)
+backend/.pytest_cache/
+backend/coverage/
+backend/.coverage
+backend/htmlcov/
+
+# Linting e Formatação (Ruff, MyPy, Black, etc.)
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/.flake8
+
+# Ferramentas de Mutação e Métricas (Mutmut e Radon)
+backend/.mutmut-cache
+# OBS: O 'setup.cfg' e 'requirements.txt' DEVEM ser versionados, então não os ignore.
+
+# ==============================================================================
+# 4. FRONTEND (React e Vue - Monorepo)
+# ==============================================================================
+# Dependências (Aplica-se ao host-shell, remote-estudantil e remote-imobiliario)
+frontend/**/node_modules/
+
+# Arquivos de Build / Compilação
+frontend/**/dist/
+frontend/**/build/
+frontend/**/.next/
+frontend/**/out/
+
+# Logs de gerenciamento de pacotes
+frontend/**/npm-debug.log*
+frontend/**/yarn-debug.log*
+frontend/**/yarn-error.log*
+frontend/**/pnpm-debug.log*
+frontend/**/lerna-debug.log*
+
+# Cobertura de testes no frontend
+frontend/**/coverage/
+
+# Arquivos de ambiente específicos do frontend
+frontend/**/.env.local
+frontend/**/.env.development.local
+frontend/**/.env.test.local
+frontend/**/.env.production.local
+
+# ==============================================================================
+# 5. CI/CD e Diversos
+# ==============================================================================
+# Cache de ações do GitHub (opcional, mas bom para limpar)
+.github/caches/
+
+# Arquivos temporários gerais
+*.tmp
+*.temp
+*.log

@@ -1,0 +1,49 @@
+name: Backend Quality & Testing CI
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'backend/**'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'backend/**'
+
+jobs:
+  test-and-verify:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Copiar código do repositório
+      uses: actions/checkout@v4
+
+    - name: Configurar Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Instalar Dependências
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r backend/requirements.txt
+        pip install pytest radon mutmut
+
+    - name: 1. Executar Testes Unitários (Pytest)
+      run: |
+        cd backend
+        pytest --tb=short
+
+    - name: 2. Verificar Complexidade Ciclomática (Radon)
+      run: |
+        cd backend
+        # Falha a pipeline se encontrar complexidade acima da classificação B
+        radon cc src/credit_engine/ -s -a --min B
+
+    - name: 3. Executar Testes de Mutação (Mutmut)
+      run: |
+        cd backend
+        # Executa no modo CI para não travar o terminal interativo
+        mutmut run --no-progress --CI
+        mutmut results
