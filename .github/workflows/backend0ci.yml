@@ -33,7 +33,7 @@ jobs:
     - name: 1. Executar Testes Unitários (Pytest)
       run: |
         cd backend
-        pytest --tb=short
+        PYTHONPATH=. pytest
 
     - name: 2. Verificar Complexidade Ciclomática (Radon)
       run: |
