@@ -1,25 +1,68 @@
-"""
-Utilize dataclasses ou Pydantic. 
-Aqui você define o formato do objeto cliente. 
-Receber o JSON cru e transformá-lo em um objeto tipado já resolve validações estruturais, 
-deixando os testes focados nas regras de negócio.
 
-Atributos: 
--idade (int), 
--renda_mensal (float), 
--score (int), 
--nome_sujo (bool), 
--co_garantidor (bool), 
--etc.
-"""
-
-from pydantic import BaseModel, Field
-
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional
+from datetime import datetime
+ 
+ 
 class ClienteSchema(BaseModel):
-    idade: int = Field(...,description="Idade do cliente em anos")
-    renda_mensal: float = Field(...,description="Renda mensal líquida em reais")
-    score: int = Field(...,description="Score de crédito de 0 a 1000")
-    valor_imovel: float = Field(...,description="Valor do imóvel pretendido")
-    nome_sujo: bool = Field(...,description="Indica se o cliente possui restrições no nome")
-    co_garantidor: bool = Field(...,description="Indica se há um co-garantidor no contrato")
-    anos_trabalho: int = Field(..., description="Anos de trabalho comprovados")
+   
+    model_config = ConfigDict(populate_by_name=True)
+ 
+    nome: str = Field(..., min_length=2, description="Nome completo do proponente")
+ 
+    idade: int = Field(..., ge=0, le=130, description="Idade do cliente em anos")
+ 
+    renda_mensal: float = Field(..., ge=0, description="Renda mensal líquida em reais",
+                                alias="rendaMensal")
+ 
+    score_credito: int = Field(
+        ..., ge=0, le=1000,
+        description="Score de crédito de 0 a 1000",
+        alias="scoreCredito"
+    )
+ 
+    possui_nome_sujo: bool = Field(
+        ...,
+        description="True se o cliente possui restrições cadastrais",
+        alias="possuiNomeSujo"
+    )
+ 
+    possui_co_garantidor: bool = Field(
+        ...,
+        description="True se há um co-garantidor no contrato",
+        alias="possuiCoGarantidor"
+    )
+ 
+    tipo_financiamento: str = Field(
+        ...,
+        description="IMOBILIARIO ou ESTUDANTIL",
+        alias="tipoFinanciamento"
+    )
+ 
+ 
+class RespostaSchema(BaseModel):
+    """
+    Formato da resposta da API.
+    """
+    status_proposta: str = Field(..., description="APROVADO, ANALISE_HUMANA ou RECUSADO")
+    taxa_juros_aplicada: Optional[float] = Field(
+        None,
+        description="Taxa em decimal. None se recusado."
+    )
+    motivo_decisao: str = Field(..., description="Explicação auditável da decisão")
+    data_processamento: datetime = Field(..., description="Timestamp UTC do processamento")
+ 
+ 
+class SimulacaoRegistradaSchema(BaseModel):
+    """
+    Representa uma simulação já salva no banco — inclui o ID gerado.
+    Usado pelo endpoint GET /api/v1/history para retornar o histórico.
+    """
+    model_config = ConfigDict(from_attributes=True)
+ 
+    id: int
+    nome_proponente: str
+    status_proposta: str
+    taxa_juros_aplicada: Optional[float]
+    motivo_decisao: str
+    data_processamento: datetime

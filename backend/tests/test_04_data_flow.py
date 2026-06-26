@@ -1,75 +1,141 @@
 """
-O que vai aqui: Focado na função calcular_taxa_juros.
+Teste 04 — Análise de Fluxo de Dados (Def-Use)
 
-Tática: Validar o ciclo de vida da variável. 
-Certificar-se de que os testes passam por todas as atribuições (Def) até o uso final (Use), 
-sem que ela seja reescrita de forma inesperada.
+Técnica: rastreia o ciclo de vida de uma variável desde sua
+definição (DEF) até cada uso (USE). Garante que não há:
+  - Uso sem definição (variável usada antes de ser inicializada)
+  - Definição sem uso (variável definida mas nunca usada — dead code)
+  - Redefinição inesperada (variável sobrescrita antes do uso previsto)
+
+Variável alvo: `taxa` em calcular_taxa_juros()
+
+Ciclo de vida mapeado:
+  DEF 1: taxa = TAXA_BASE_IMOBILIARIO ou TAXA_BASE_ESTUDANTIL
+  USE 1 (condicional): taxa -= DESCONTO_SCORE_EXCELENTE  (se score >= 801)
+  USE 2 (condicional): taxa -= DESCONTO_SCORE_BOM        (se 601 <= score < 801)
+  USE 3 (condicional): taxa += ACRESCIMO_SCORE_REGULAR   (se 401 <= score < 601)
+  USE 4 (condicional): taxa += ACRESCIMO_SCORE_BAIXO     (se score < 401)
+  USE FINAL: return round(taxa, 4)
+
+Os 4 USEs condicionais são mutuamente exclusivos — apenas um executa.
 """
 
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src/credit_engine')))
-
 import pytest
-from src.credit_engine.rules import calcular_taxa_juros
-from src.credit_engine.schemas import ClienteSchema
+from tests.conftest import cliente_factory
+from credit_engine.rules import calcular_taxa_juros
+from credit_engine.constants import (
+    TAXA_BASE_IMOBILIARIO, TAXA_BASE_ESTUDANTIL,
+    DESCONTO_SCORE_EXCELENTE, DESCONTO_SCORE_BOM,
+    ACRESCIMO_SCORE_REGULAR, ACRESCIMO_SCORE_BAIXO,
+)
 
-# Base do cliente padrão adaptada para refletir o comportamento real do motor
-CLIENTE_BASE = {
-    "idade": 35,          
-    "anos_trabalho": 2,   
-    "renda_mensal": 6000.0,
-    "valor_imovel": 300000.0,
-    "nome_sujo": False,
-    "co_garantidor": False
-}
 
 # ==============================================================================
-# CAMINHOS DEF-USE (CICLO DE VIDA DA TAXA DE JUROS)
+# Caminhos Def-Use por faixa de score — Modalidade IMOBILIARIO
 # ==============================================================================
 
-def test_fluxo_dados_apenas_taxa_base():
+def test_fluxo_taxa_base_imobiliario_score_excelente():
     """
-    Caminho Def-Clear Puro:
-    Ajustado para 0.09 após revelação do Oráculo do sistema.
+    DEF → USE 1 (desconto excelente) → USE FINAL
+    Score 900 → faixa Excelente → taxa = 10% - 1.5% = 8.5%
     """
-    cliente = ClienteSchema(score=500, **CLIENTE_BASE)
-    # O sistema retornou 0.09, o que significa que o comportamento padrão obtido é 9%
-    assert pytest.approx(calcular_taxa_juros(cliente), 0.0001) == 0.09
+    cliente = cliente_factory(score_credito=900, tipo_financiamento="IMOBILIARIO")
+    taxa = calcular_taxa_juros(cliente)
+    esperado = round(TAXA_BASE_IMOBILIARIO - DESCONTO_SCORE_EXCELENTE, 4)
+    assert taxa == pytest.approx(esperado, abs=0.0001)
 
 
-def test_fluxo_dados_acumulo_descontos_score_excelente_e_estabilidade():
+def test_fluxo_taxa_base_imobiliario_score_bom():
     """
-    Caminho de Múltiplas Definições (Reduções):
-    Aplica bônus adicionais de estabilidade e score excelente sobre a curva base.
+    DEF → USE 2 (desconto bom) → USE FINAL
+    Score 700 → faixa Bom → taxa = 10% - 0.5% = 9.5%
     """
-    cliente = ClienteSchema(
-        score=900,            
-        anos_trabalho=6,      
-        idade=35,             
-        renda_mensal=6000.0,
-        valor_imovel=300000.0,
-        nome_sujo=False,
-        co_garantidor=False
-    )
-    # Se a base era 0.09, com os descontos adicionais vai para 0.05 ou 0.06 dependendo da regra acumulada
-    resultado = calcular_taxa_juros(cliente)
-    assert resultado < 0.09  # Garante que o fluxo de dados reduziu a taxa
+    cliente = cliente_factory(score_credito=700, tipo_financiamento="IMOBILIARIO")
+    taxa = calcular_taxa_juros(cliente)
+    esperado = round(TAXA_BASE_IMOBILIARIO - DESCONTO_SCORE_BOM, 4)
+    assert taxa == pytest.approx(esperado, abs=0.0001)
 
 
-def test_fluxo_dados_acumulo_com_risco_idade():
+def test_fluxo_taxa_base_imobiliario_score_regular():
     """
-    Caminho Misto (Desconto + Acréscimo):
-    Garante que a idade avançada penaliza e aumenta o valor final da taxa.
+    DEF → USE 3 (acréscimo regular) → USE FINAL
+    Score 500 → faixa Regular → taxa = 10% + 1.0% = 11.0%
     """
-    cliente = ClienteSchema(
-        score=700,            
-        anos_trabalho=2,      
-        idade=70,             # Ativa acréscimo risco idade (+2%)
-        renda_mensal=6000.0,
-        valor_imovel=300000.0,
-        nome_sujo=False,
-        co_garantidor=False
-    )
-    resultado = calcular_taxa_juros(cliente)
-    assert resultado > 0.06  # Garante que o risco atuou aumentando a taxa em relação ao cenário ideal
+    cliente = cliente_factory(score_credito=500, tipo_financiamento="IMOBILIARIO")
+    taxa = calcular_taxa_juros(cliente)
+    esperado = round(TAXA_BASE_IMOBILIARIO + ACRESCIMO_SCORE_REGULAR, 4)
+    assert taxa == pytest.approx(esperado, abs=0.0001)
+
+
+def test_fluxo_taxa_base_imobiliario_score_baixo():
+    """
+    DEF → USE 4 (acréscimo baixo) → USE FINAL
+    Score 200 → faixa Baixo → taxa = 10% + 3.0% = 13.0%
+    """
+    cliente = cliente_factory(score_credito=200, tipo_financiamento="IMOBILIARIO")
+    taxa = calcular_taxa_juros(cliente)
+    esperado = round(TAXA_BASE_IMOBILIARIO + ACRESCIMO_SCORE_BAIXO, 4)
+    assert taxa == pytest.approx(esperado, abs=0.0001)
+
+
+# ==============================================================================
+# Caminhos Def-Use — Modalidade ESTUDANTIL (taxa base diferente)
+# ==============================================================================
+
+def test_fluxo_taxa_base_estudantil_score_excelente():
+    """
+    DEF com taxa diferente → USE 1 → USE FINAL
+    Score 900 + Estudantil → taxa = 6% - 1.5% = 4.5%
+    Valida que a DEF correta foi usada (não a imobiliária).
+    """
+    cliente = cliente_factory(score_credito=900, tipo_financiamento="ESTUDANTIL")
+    taxa = calcular_taxa_juros(cliente)
+    esperado = round(TAXA_BASE_ESTUDANTIL - DESCONTO_SCORE_EXCELENTE, 4)
+    assert taxa == pytest.approx(esperado, abs=0.0001)
+
+
+def test_fluxo_taxa_base_estudantil_score_baixo():
+    """
+    DEF Estudantil → USE 4 (pior modificador) → USE FINAL
+    Score 200 + Estudantil → taxa = 6% + 3.0% = 9.0%
+    """
+    cliente = cliente_factory(score_credito=200, tipo_financiamento="ESTUDANTIL")
+    taxa = calcular_taxa_juros(cliente)
+    esperado = round(TAXA_BASE_ESTUDANTIL + ACRESCIMO_SCORE_BAIXO, 4)
+    assert taxa == pytest.approx(esperado, abs=0.0001)
+
+
+# ==============================================================================
+# Invariantes — garantias que SEMPRE devem se manter
+# ==============================================================================
+
+@pytest.mark.parametrize("score, tipo", [
+    (900, "IMOBILIARIO"), (900, "ESTUDANTIL"),
+    (700, "IMOBILIARIO"), (700, "ESTUDANTIL"),
+    (500, "IMOBILIARIO"), (500, "ESTUDANTIL"),
+    (200, "IMOBILIARIO"), (200, "ESTUDANTIL"),
+])
+def test_invariante_taxa_sempre_positiva(score, tipo):
+    """
+    Invariante crítica: a taxa NUNCA pode ser zero ou negativa.
+    Mesmo com o maior desconto possível (score 1000, estudantil):
+    6% - 1.5% = 4.5% — sempre positivo.
+    """
+    cliente = cliente_factory(score_credito=score, tipo_financiamento=tipo)
+    taxa = calcular_taxa_juros(cliente)
+    assert taxa > 0, f"Taxa negativa detectada: {taxa} para score={score}, tipo={tipo}"
+
+
+def test_invariante_imobiliario_sempre_maior_estudantil():
+    """
+    Para o mesmo score, taxa imobiliária SEMPRE > taxa estudantil.
+    Isso é garantido pelas taxas base (10% vs 6%) e modificadores idênticos.
+    """
+    for score in [900, 700, 500, 200]:
+        cliente_imob = cliente_factory(score_credito=score, tipo_financiamento="IMOBILIARIO")
+        cliente_estud = cliente_factory(score_credito=score, tipo_financiamento="ESTUDANTIL")
+        taxa_imob = calcular_taxa_juros(cliente_imob)
+        taxa_estud = calcular_taxa_juros(cliente_estud)
+        assert taxa_imob > taxa_estud, (
+            f"Score {score}: imobiliário ({taxa_imob}) deveria ser > estudantil ({taxa_estud})"
+        )

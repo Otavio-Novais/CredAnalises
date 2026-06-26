@@ -1,70 +1,132 @@
 """
-O que vai aqui: Exclusivo para as fronteiras matemáticas.
+Para cada fronteira, testamos 3 pontos:
+  (fronteira - 1), (fronteira), (fronteira + 1)
 
-Tática: Testar estritamente as idades [17, 18, 19] e [74, 75, 76], e os scores [-1, 0, 1] e [999, 1000, 1001].
+Fronteiras deste sistema:
+  Idade: 18 (mínimo), 75 (máximo)
+  Score: 0 (mínimo), 1000 (máximo)
+  Score de aprovação: 600 (limiar de aprovação automática)
+  Score de análise: 400 (limiar de análise humana)
 """
 
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src/credit_engine')))
-
 import pytest
-from src.credit_engine.rules import avaliar_credito
-from src.credit_engine.schemas import ClienteSchema
-
-# ==============================================================================
-# 1. BVA PARA A FRONTEIRA DE IDADE (Limites: 18 e 75 anos)
-# ==============================================================================
-
-@pytest.mark.parametrize(
-    "idade, resultado_esperado",
-    [
-        (17, "Recusado"),  # Limite Inferior - 1 (Inválido)
-        (18, "Aprovado"),  # No Limite Inferior (Válido)
-        (19, "Aprovado"),  # Limite Inferior + 1 (Válido)
-        (74, "Aprovado"),  # Limite Superior - 1 (Válido)
-        (75, "Aprovado"),  # No Limite Superior (Válido)
-        (76, "Recusado"),  # Limite Superior + 1 (Inválido)
-    ]
+from tests.conftest import cliente_factory
+from credit_engine.rules import avaliar_credito, calcular_taxa_juros
+from credit_engine.constants import (
+    IDADE_MINIMA, IDADE_MAXIMA,
+    SCORE_MINIMO, SCORE_MAXIMO,
+    SCORE_MINIMO_APROVACAO,
+    SCORE_MINIMO_ANALISE_HUMANA,
+    SCORE_EXCELENTE_MIN, SCORE_BOM_MIN, SCORE_REGULAR_MIN,
+    TAXA_BASE_IMOBILIARIO, TAXA_BASE_ESTUDANTIL,
+    DESCONTO_SCORE_EXCELENTE, DESCONTO_SCORE_BOM,
+    ACRESCIMO_SCORE_REGULAR, ACRESCIMO_SCORE_BAIXO,
 )
-def test_bva_fronteiras_idade(idade, resultado_esperado):
-    """Testa os 3 valores das fronteiras inferior (18) e superior (75) da idade"""
-    cliente = ClienteSchema(
-        idade=idade,
-        score=850,  # Mantém o resto perfeito e válido
-        renda_mensal=6000.0,
-        valor_imovel=300000.0,
-        nome_sujo=False,
-        co_garantidor=False,
-        anos_trabalho=6
-    )
-    assert avaliar_credito(cliente) == resultado_esperado
 
 
 # ==============================================================================
-# 2. BVA PARA A FRONTEIRA DE SCORE (Limites: 0 e 1000)
+# 1. BVA — Fronteira de Idade
 # ==============================================================================
 
-@pytest.mark.parametrize(
-    "score, resultado_esperado",
-    [
-        (-1, "Recusado"),   # Limite Inferior - 1 (Inválido)
-        (0, "Análise humana"),    # No Limite Inferior (Válido, cai na análise humana por score baixo)
-        (1, "Análise humana"),    # Limite Inferior + 1 (Válido)
-        (999, "Aprovado"),  # Limite Superior - 1 (Válido)
-        (1000, "Aprovado"), # No Limite Superior (Válido)
-        (1001, "Recusado"), # Limite Superior + 1 (Inválido)
-    ]
-)
-def test_bva_fronteiras_score(score, resultado_esperado):
-    """Testa os 3 valores das fronteiras inferior (0) e superior (1000) do score de crédito"""
-    cliente = ClienteSchema(
-        idade=30,
-        score=score,
-        renda_mensal=6000.0,  # Renda alta para tentar aprovação nos scores válidos
-        valor_imovel=300000.0,
-        nome_sujo=False,
-        co_garantidor=False,
-        anos_trabalho=6
+@pytest.mark.parametrize("idade, status_esperado", [
+    (IDADE_MINIMA - 1, "RECUSADO"),   # 17 — abaixo do mínimo
+    (IDADE_MINIMA,     "APROVADO"),   # 18 — exatamente no mínimo
+    (IDADE_MINIMA + 1, "APROVADO"),   # 19 — acima do mínimo
+    (IDADE_MAXIMA - 1, "APROVADO"),   # 74 — abaixo do máximo
+    (IDADE_MAXIMA,     "APROVADO"),   # 75 — exatamente no máximo
+    (IDADE_MAXIMA + 1, "RECUSADO"),   # 76 — acima do máximo
+])
+def test_bva_fronteiras_idade(idade, status_esperado):
+    """BVA nas fronteiras de elegibilidade por idade (RN01)."""
+    cliente = cliente_factory(idade=idade)
+    resultado = avaliar_credito(cliente)
+    assert resultado["status"] == status_esperado, (
+        f"Idade {idade}: esperado '{status_esperado}', "
+        f"obtido '{resultado['status']}'. Motivo: {resultado['motivo']}"
     )
-    assert avaliar_credito(cliente) == resultado_esperado
+
+
+# ==============================================================================
+# 2. BVA — Fronteira de Score (validade do dado)
+# ==============================================================================
+
+@pytest.mark.parametrize("score, status_esperado", [
+    # Score inválido é rejeitado pelo Pydantic (ge=0, le=1000)
+    # Score 0 é válido mas cai em recusa de crédito (score muito baixo)
+    (SCORE_MINIMO,     "RECUSADO"),       # 0 — mínimo válido, mas sem crédito
+    (SCORE_MINIMO + 1, "RECUSADO"),       # 1 — ainda sem crédito
+    (SCORE_MAXIMO - 1, "APROVADO"),       # 999 — quase máximo, aprovado
+    (SCORE_MAXIMO,     "APROVADO"),       # 1000 — máximo, aprovado
+])
+def test_bva_fronteiras_score_validade(score, status_esperado):
+    """BVA nos limites de validade do score (0 e 1000)."""
+    cliente = cliente_factory(score_credito=score)
+    resultado = avaliar_credito(cliente)
+    assert resultado["status"] == status_esperado
+
+
+# ==============================================================================
+# 3. BVA — Fronteira de Aprovação (score 600)
+# ==============================================================================
+
+@pytest.mark.parametrize("score, status_esperado", [
+    (SCORE_MINIMO_APROVACAO - 1, "ANALISE_HUMANA"),  # 599 — não aprova
+    (SCORE_MINIMO_APROVACAO,     "ANALISE_HUMANA"),  # 600 — não aprova (> 600 é o critério)
+    (SCORE_MINIMO_APROVACAO + 1, "APROVADO"),        # 601 — aprova
+])
+def test_bva_fronteira_score_aprovacao(score, status_esperado):
+    """
+    BVA na fronteira crítica de aprovação automática (RN02).
+    O critério é score > 600, não >= 600.
+    Portanto 600 NÃO aprova — este é um ponto frequente de bug.
+    """
+    cliente = cliente_factory(renda_mensal=6000.0, score_credito=score)
+    resultado = avaliar_credito(cliente)
+    assert resultado["status"] == status_esperado
+
+
+# ==============================================================================
+# 4. BVA — Fronteira de Análise Humana (score 400)
+# ==============================================================================
+
+@pytest.mark.parametrize("score, status_esperado", [
+    (SCORE_MINIMO_ANALISE_HUMANA - 1, "RECUSADO"),       # 399 — recusado
+    (SCORE_MINIMO_ANALISE_HUMANA,     "RECUSADO"),        # 400 — não entra em análise (> 400)
+    (SCORE_MINIMO_ANALISE_HUMANA + 1, "ANALISE_HUMANA"), # 401 — análise humana
+])
+def test_bva_fronteira_analise_humana(score, status_esperado):
+    """
+    BVA na fronteira de análise humana (RN02).
+    Critério: score > 400. Portanto 400 é RECUSADO, não ANALISE_HUMANA.
+    """
+    cliente = cliente_factory(renda_mensal=2000.0, score_credito=score)
+    resultado = avaliar_credito(cliente)
+    assert resultado["status"] == status_esperado
+
+
+# ==============================================================================
+# 5. BVA — Fronteiras de Modificadores de Taxa (calcular_taxa_juros)
+# ==============================================================================
+
+@pytest.mark.parametrize("score, taxa_base, modificador_esperado", [
+    # Fronteira Score Excelente: 800 → Bom, 801 → Excelente
+    (SCORE_EXCELENTE_MIN - 1, TAXA_BASE_IMOBILIARIO, -DESCONTO_SCORE_BOM),      # 800: Bom
+    (SCORE_EXCELENTE_MIN,     TAXA_BASE_IMOBILIARIO, -DESCONTO_SCORE_EXCELENTE), # 801: Excelente
+    # Fronteira Score Bom: 600 → Regular, 601 → Bom
+    (SCORE_BOM_MIN - 1, TAXA_BASE_IMOBILIARIO, ACRESCIMO_SCORE_REGULAR),         # 600: Regular
+    (SCORE_BOM_MIN,     TAXA_BASE_IMOBILIARIO, -DESCONTO_SCORE_BOM),             # 601: Bom
+    # Fronteira Score Regular: 400 → Baixo, 401 → Regular
+    (SCORE_REGULAR_MIN - 1, TAXA_BASE_IMOBILIARIO, ACRESCIMO_SCORE_BAIXO),       # 400: Baixo
+    (SCORE_REGULAR_MIN,     TAXA_BASE_IMOBILIARIO, ACRESCIMO_SCORE_REGULAR),     # 401: Regular
+])
+def test_bva_fronteiras_modificadores_taxa(score, taxa_base, modificador_esperado):
+    """
+    BVA nas fronteiras dos modificadores de taxa (RN04).
+    Verifica que cada faixa aplica o modificador correto.
+    """
+    cliente = cliente_factory(score_credito=score, tipo_financiamento="IMOBILIARIO")
+    taxa = calcular_taxa_juros(cliente)
+    esperado = round(taxa_base + modificador_esperado, 4)
+    assert taxa == pytest.approx(esperado, abs=0.0001), (
+        f"Score {score}: taxa esperada {esperado:.4f}, obtida {taxa:.4f}"
+    )

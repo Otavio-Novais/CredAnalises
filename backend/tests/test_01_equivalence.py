@@ -1,68 +1,85 @@
 """
-O que vai aqui: 
-O teste do "Caminho Feliz" (todas as variáveis válidas) e as partições inválidas isoladas.
-
-Tática: Usar @pytest.mark.parametrize para injetar os diferentes dicionários de erro (idade negativa, renda negativa, etc.) 
-garantindo que o sistema rejeita de forma controlada.
+Classes identificadas para este sistema:
+  Idade: [< 18] [18–75] [> 75]
+  Score: [< 0] [0–1000] [> 1000]
+  Nome sujo: [True] [False]
+  Renda: [> 5000] [3001–5000] [≤ 3000]
 """
 
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src/credit_engine')))
-
 import pytest
-from src.credit_engine.rules import avaliar_credito
-from src.credit_engine.schemas import ClienteSchema
+from tests.conftest import cliente_factory
+from credit_engine.rules import avaliar_credito
+
 
 # ==============================================================================
-# 1. CAMINHO FELIZ (Classe de Equivalência Válida)
+# 1. Caminho Feliz — Classe Válida Completa
 # ==============================================================================
-def test_caminho_feliz_sucesso():
+
+def test_caminho_feliz_aprovado():
     """
-    Testa a 'Regra de Ouro': Combina apenas entradas perfeitamente válidas.
-    Idade entre 18 e 75, score positivo e alto, renda excelente, sem nome sujo.
-    O resultado esperado é 'Aprovado'.
+    Todas as variáveis na classe válida ótima.
+    Garante que o motor aprova quando tudo está correto.
     """
-    cliente_valido = ClienteSchema(
-        idade=30,
-        score=850,
-        renda_mensal=6000.0,
-        valor_imovel=300000.0,
-        nome_sujo=False,
-        co_garantidor=False,
-        anos_trabalho=6
+    cliente = cliente_factory()  # defaults perfeitos
+    resultado = avaliar_credito(cliente)
+    assert resultado["status"] == "APROVADO"
+
+
+# ==============================================================================
+# 2. Partições Inválidas — Uma variável inválida por vez
+# ==============================================================================
+
+@pytest.mark.parametrize("campo, valor, status_esperado", [
+    # Classe inválida: idade abaixo do mínimo
+    ("idade", 15, "RECUSADO"),
+    # Classe inválida: idade acima do máximo
+    ("idade", 80, "RECUSADO"),
+    # Classe inválida: nome sujo
+    ("possui_nome_sujo", True, "RECUSADO"),
+    # Classe inválida: tipo de financiamento inexistente
+    ("tipo_financiamento", "AUTOMOVEL", "RECUSADO"),
+])
+def test_particoes_invalidas_impeditivas(campo, valor, status_esperado):
+    """
+    Garante que cada classe impeditiva individualmente causa recusa.
+    Padrão: só um campo inválido por vez — isolamento da causa.
+    """
+    cliente = cliente_factory(**{campo: valor})
+    resultado = avaliar_credito(cliente)
+    assert resultado["status"] == status_esperado
+
+
+@pytest.mark.parametrize("renda, score, co_garantidor, status_esperado", [
+    # Classe válida ótima: renda alta + score alto
+    (6000.0, 700, False, "APROVADO"),
+    # Classe limiar: renda suficiente + score baixo → análise humana
+    (6000.0, 500, False, "ANALISE_HUMANA"),
+    # Classe válida alternativa: co-garantidor + renda mínima
+    (3500.0, 450, True, "APROVADO"),
+    # Classe inválida de crédito: sem garantidor + renda baixa + score baixo
+    (2000.0, 300, False, "RECUSADO"),
+])
+def test_classes_de_veredito(renda, score, co_garantidor, status_esperado):
+    """
+    Testa as classes que determinam o veredito de crédito (RN02).
+    Cada linha representa uma classe de equivalência distinta.
+    """
+    cliente = cliente_factory(
+        renda_mensal=renda,
+        score_credito=score,
+        possui_co_garantidor=co_garantidor,
     )
-    assert avaliar_credito(cliente_valido) == "Aprovado"
+    resultado = avaliar_credito(cliente)
+    assert resultado["status"] == status_esperado
 
 
 # ==============================================================================
-# 2. PARTIÇÕES INVÁLIDAS ISOLADAS (Tática: Parametrizar Erros Controlados)
+# 3. Classes por Tipo de Financiamento
 # ==============================================================================
-# Mudamos apenas UM campo inválido por vez, mantendo o resto do cliente "perfeito"
-# para garantir que o sistema recusa estritamente por causa daquela partição.
-@pytest.mark.parametrize(
-    "idade, score, renda_mensal, nome_sujo",
-    [
-        (15, 850, 6000.0, False),    # Idade inválida: abaixo do mínimo (18)
-        (80, 850, 6000.0, False),    # Idade inválida: acima do máximo (75)
-        (30, -5, 6000.0, False),     # Score inválido: abaixo do mínimo (0)
-        (30, 1050, 6000.0, False),   # Score inválido: acima do máximo (1000)
-        (30, 850, 6000.0, True),     # Nome Sujo: restrição crítica automática
-    ]
-)
-def test_particoes_invalidas_isoladas(idade, score, renda_mensal, nome_sujo):
-    """
-    Garante que o sistema rejeita de forma controlada ("Recusado")
-    quando uma única variável entra em uma classe de equivalência inválida.
-    """
-    cliente_teste = ClienteSchema(
-        idade=idade,
-        score=score,
-        renda_mensal=renda_mensal,
-        valor_imovel=300000.0,
-        nome_sujo=nome_sujo,
-        co_garantidor=False,
-        anos_trabalho=6
-    )
-    
-    assert avaliar_credito(cliente_teste) == "Recusado"
+
+@pytest.mark.parametrize("tipo", ["IMOBILIARIO", "ESTUDANTIL"])
+def test_tipos_financiamento_validos(tipo):
+    """Ambos os tipos válidos devem passar pela análise sem recusa por tipo."""
+    cliente = cliente_factory(tipo_financiamento=tipo)
+    resultado = avaliar_credito(cliente)
+    assert resultado["status"] == "APROVADO"
