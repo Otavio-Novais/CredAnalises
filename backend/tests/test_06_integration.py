@@ -92,4 +92,40 @@ def test_service_idempotencia_expirada(monkeypatch):
     assert "[CACHE]" not in resposta_expirada.motivo_decisao
     assert len(repo.listar_simulacoes()) == 2  # Salvou um novo registro
 
+def test_service_idempotencia_com_data_sem_timezone():
+    """Força o sistema a passar pela linha 110 para garantir 100% de cobertura."""
+    repo = InMemoryCreditRepository()
+    service = CreditService(repositorio=repo)
+    
+    # 1. Salva um registro diretamente no repositório com data SEM TIMEZONE (naive)
+    registro_sem_tz = repo.salvar_simulacao(
+        nome_proponente="Renan Momo",
+        status_proposta="APROVADO",
+        taxa_juros_aplicada=4.5,
+        motivo_decisao="Aprovado",
+        hash_requisicao="hash_teste_tz_123"
+    )
+    
+    # Remove o timezone da data manualmente para simular um dado "sujo" no banco
+    registro_sem_tz.data_processamento = registro_sem_tz.data_processamento.replace(tzinfo=None)
+    
+    # 2. Cria o schema com o mesmo hash para acionar o cache de idempotência
+    cliente = ClienteSchema(
+        nome="Dante Alighieri",
+        idade=30,
+        renda_mensal=8000.0,
+        score_credito=800,
+        possui_nome_sujo=False,
+        possui_co_garantidor=False,
+        tipo_financiamento="IMOBILIARIO"
+    )
+    
+    # Injeta o mesmo hash gerado para o teste bater no registro alterado
+    # (O service vai gerar o hash interno, então garantimos que seja o mesmo do cliente)
+    hash_real = service._gerar_hash(cliente)
+    registro_sem_tz.hash_requisicao = hash_real
 
+    # 3. Executa a avaliação. O service vai ler a data sem tz, entrar no IF da linha 110 e corrigir!
+    resposta = service.avaliar_credito(cliente)
+    
+    assert "[CACHE]" in resposta.motivo_decisao
