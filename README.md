@@ -61,18 +61,19 @@ projeto_VDDS/
 
 ### Frontend
 
-- React 19.
-- Vite.
-- React Router.
-- TanStack React Query.
-- Axios.
+- Python 3.11
+- Streamlit.
+- Requests.
+- Pandas.
 
 ### Testes e Qualidade
 
-- Pytest.
+- Pytest (Backend).
 - Pytest-cov.
 - Radon.
 - Mutmut.
+- Pylint (Frontend).
+- Flake8 (Frontend).
 
 ## Regras de Negócio
 
@@ -160,34 +161,27 @@ O frontend está preparado com Vite e React e serve como base para a interface d
 
 ## Instalação
 
-### 1. Instalar dependências do frontend
-
-As dependências do frontend ficam na pasta `frontend/`:
-
-```bash
-npm run install:all
-```
-
-### 2. Instalar dependências do backend
+### Backend
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+```
+
+### Frontend
+
+```bash
+cd frontend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r src/requirements.txt
 ```
 
 ## Execução Local
 
 ### Backend
-
-Na raiz do repositório:
-
-```bash
-npm run dev:backend
-```
-
-Ou diretamente no diretório backend:
 
 ```bash
 cd backend
@@ -198,73 +192,94 @@ Por padrão, a API sobe em `http://127.0.0.1:8000`.
 
 ### Frontend
 
-Na raiz do repositório:
-
 ```bash
-npm run dev:frontend
+cd frontend/src
+streamlit run app.py
 ```
 
-Ou diretamente na pasta frontend:
+A aplicação abre em `http://localhost:8501`.
+
+### Testes do Backend
 
 ```bash
-cd frontend
-npm run dev
-```
-
-### Build do Frontend
-
-```bash
-npm run build:frontend
+cd backend
+pytest                          # Executar todos os testes
+pytest --cov=credit_engine      # Com cobertura
+pytest -v                       # Modo verbose
 ```
 
 ## Testes
 
-Os testes automatizados do backend estão organizados por técnica de validação:
+Os testes automatizados estão organizados por técnica de validação:
 
+**Backend:**
 - `test_01_equivalence.py`: classes de equivalência.
 - `test_02_bva.py`: análise de valor limite.
 - `test_03_mcdc.py`: MC/DC.
 - `test_04_data_flow.py`: fluxo de dados.
+- `test_05_state.py`: máquina de estados.
+- `test_06_integration.py`: testes de integração.
 
-Para executar a suíte:
+**CI/CD:**
 
-```bash
-cd backend
-pytest
-```
+O projeto usa GitHub Actions para validação automática:
 
-Para cobertura:
-
-```bash
-cd backend
-pytest --cov=credit_engine
-```
+- `.github/workflows/backend-ci.yml`: testes do backend (Pytest, Radon, Mutmut).
+- `.github/workflows/frontend-ci.yml`: validação do frontend (Pylint, Flake8, startup test).
 
 ## Qualidade e Análise
 
-O projeto já inclui ferramentas úteis para análise estrutural e mutação de testes:
+**Backend:**
 
 ```bash
 cd backend
-radon cc src/credit_engine
-mutmut run
+radon cc src/credit_engine              # Complexidade ciclomática
+mutmut run                              # Testes de mutação
+flake8 src/credit_engine                # Estilo de código
 ```
 
-## Variáveis de Ambiente
+**Frontend:**
 
-- `DATABASE_URL`: string de conexão do banco de dados.
-- `PORT`: usado no frontend ao publicar a aplicação com `serve`.
+```bash
+cd frontend/src
+pylint app.py                           # Análise estática
+flake8 app.py                           # Estilo PEP 8
+```
 
-Se `DATABASE_URL` não estiver definida, o backend usa SQLite local em `./creditcalc.db`.
+## Deployment no Render
 
-## Observações de Implantação
+O projeto está configurado para deploy automático no Render:
+
+### Backend
+
+1. Conectar repositório no Render
+2. Criar serviço Web com:
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `cd backend && uvicorn credit_engine.main:app --app-dir src --host 0.0.0.0 --port $PORT`
+   - **Environment**: Python 3.11
+
+### Frontend
+
+1. Criar serviço Web com:
+   - **Build Command**: `pip install -r src/requirements.txt`
+   - **Start Command**: `cd frontend/src && streamlit run app.py --server.port=$PORT --server.address=0.0.0.0`
+   - **Environment**: Python 3.11
+
+### Variáveis de Ambiente
+
+- `DATABASE_URL`: string de conexão do banco (opcional, usa SQLite local por padrão)
+- Backend e Frontend devem ter configuração CORS apropriada para produção
+
+### Observações
 
 - O backend já está configurado para CORS aberto em desenvolvimento.
-- O `Procfile` existe tanto em backend quanto frontend para facilitar deploys em plataformas compatíveis.
-- Em produção, recomenda-se restringir o CORS para o domínio do frontend.
+- Cada serviço tem seu próprio `Procfile` para facilitar o deployment.
+- Em produção no Render, a variável `$PORT` é automaticamente injetada.
 
 ## Próximos Passos Possíveis
 
-- Implementar uma interface completa no frontend para consumo da API.
-- Adicionar exemplos de payload e respostas no README com base em cenários de teste.
-- Incluir diagrama de fluxo da análise de crédito para apresentação acadêmica.
+- Adicionar mais testes de integração entre frontend e backend no Streamlit.
+- Implementar persistência em banco de dados relacional (PostgreSQL) em produção.
+- Adicionar autenticação e autorização.
+- Expandir a suite de testes com Selenium para testes end-to-end.
+- Criar dashboard de análise de dados com pandas/plotly no frontend.
