@@ -1,7 +1,0 @@
-@import "tailwindcss";
-@theme {
-  --color-brand: #ff0000;
-}
-@tailwind base;
-@tailwind components;
-@tailwind utilities;

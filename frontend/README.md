@@ -1,16 +1,58 @@
-# React + Vite
+# Frontend - CreditCalc Engine (Streamlit)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Interface web para o motor de análise de crédito construída com **Streamlit**.
 
-Currently, two official plugins are available:
+## Requisitos
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Python 3.8+
+- `pip` ou `pip3`
 
-## React Compiler
+## Instalação
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 1. Criar ambiente virtual (recomendado)
 
-## Expanding the ESLint configuration
+```bash
+cd frontend
+python3 -m venv venv
+source venv/bin/activate  # No Windows: venv\Scripts\activate
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 2. Instalar dependências
+
+```bash
+pip install -r src/requirements.txt
+```
+
+## Executar Localmente
+
+```bash
+cd src
+streamlit run app.py
+```
+
+A aplicação abrirá em `http://localhost:8501`
+
+## Dependências
+
+- **streamlit**: Framework para UI interativa
+- **requests**: Cliente HTTP para comunicar com o backend
+- **pandas**: Manipulação de dados
+
+## Configuração da API
+
+Por padrão, o app espera que o backend está rodando em `http://localhost:8000`.
+
+Para mudar o URL da API, edite `src/app.py`:
+
+```python
+API_BASE_URL = "http://seu-backend-url:porta"
+```
+
+## Deployment (Heroku)
+
+O `Procfile` está configurado para rodar o Streamlit em produção:
+
+```
+web: cd src && streamlit run app.py --server.port=$PORT --server.address=0.0.0.0
+```
+

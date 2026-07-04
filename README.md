@@ -1,6 +1,6 @@
 # Projeto VDDS - Motor de Análise de Crédito
 
-Projeto desenvolvido para a disciplina de **Validação e Verificação de Software**. O sistema implementa um motor de análise de crédito com backend em **FastAPI** e frontend em **React + Vite**, com foco em regras de negócio determinísticas, persistência de simulações e apoio a testes de software.
+Projeto desenvolvido para a disciplina de **Validação e Verificação de Software**. O sistema implementa um motor de análise de crédito com backend em **FastAPI** e frontend em **Streamlit**, com foco em regras de negócio determinísticas, persistência de simulações e apoio a testes de software.
 
 ## Objetivo
 
@@ -18,6 +18,7 @@ O repositório também foi estruturado para apoiar técnicas de teste vistas na 
 ```text
 projeto_VDDS/
 ├── package.json
+├── README.md
 ├── backend/
 │   ├── requirements.txt
 │   ├── setup.cfg
@@ -35,19 +36,17 @@ projeto_VDDS/
 │       ├── test_01_equivalence.py
 │       ├── test_02_bva.py
 │       ├── test_03_mcdc.py
-│       └── test_04_data_flow.py
+│       ├── test_04_data_flow.py
+│       ├── test_05_state.py
+│       └── test_06_integration.py
 └── frontend/
-    ├── package.json
-    ├── vite.config.js
+    ├── README.md
+    ├── Procfile
+    ├── venv/ (ambiente virtual)
     └── src/
-        ├── App.jsx
-        ├── main.jsx
-        ├── index.css
-        ├── components/
-        ├── hooks/
-        ├── pages/
-        ├── sevices/
-        └── utils/
+        ├── app.py (Streamlit app)
+        ├── requirements.txt
+```
 ```
 
 ## Tecnologias Utilizadas
