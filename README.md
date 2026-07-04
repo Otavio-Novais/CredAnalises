@@ -219,6 +219,8 @@ Os testes automatizados estão organizados por técnica de validação:
 - `test_04_data_flow.py`: fluxo de dados.
 - `test_05_state.py`: máquina de estados.
 - `test_06_integration.py`: testes de integração.
+- `test_07_main.py`: integração de rota/HTTP
+- `test_08_database.py`: unitário/componente com fakes
 
 **CI/CD:**
 

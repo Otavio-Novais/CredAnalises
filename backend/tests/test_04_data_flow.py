@@ -105,6 +105,25 @@ def test_fluxo_taxa_base_estudantil_score_baixo():
     assert taxa == pytest.approx(esperado, abs=0.0001)
 
 
+@pytest.mark.parametrize(
+    "score,tipo,esperado",
+    [
+        (801, "IMOBILIARIO", round(TAXA_BASE_IMOBILIARIO - DESCONTO_SCORE_EXCELENTE, 4)),
+        (601, "IMOBILIARIO", round(TAXA_BASE_IMOBILIARIO - DESCONTO_SCORE_BOM, 4)),
+        (401, "IMOBILIARIO", round(TAXA_BASE_IMOBILIARIO + ACRESCIMO_SCORE_REGULAR, 4)),
+        (400, "IMOBILIARIO", round(TAXA_BASE_IMOBILIARIO + ACRESCIMO_SCORE_BAIXO, 4)),
+        (801, "ESTUDANTIL", round(TAXA_BASE_ESTUDANTIL - DESCONTO_SCORE_EXCELENTE, 4)),
+        (601, "ESTUDANTIL", round(TAXA_BASE_ESTUDANTIL - DESCONTO_SCORE_BOM, 4)),
+        (401, "ESTUDANTIL", round(TAXA_BASE_ESTUDANTIL + ACRESCIMO_SCORE_REGULAR, 4)),
+        (400, "ESTUDANTIL", round(TAXA_BASE_ESTUDANTIL + ACRESCIMO_SCORE_BAIXO, 4)),
+    ],
+)
+def test_fluxo_taxa_base_nas_fronteiras_exatas(score, tipo, esperado):
+    cliente = cliente_factory(score_credito=score, tipo_financiamento=tipo)
+    taxa = calcular_taxa_juros(cliente)
+    assert taxa == pytest.approx(esperado, abs=0.0001)
+
+
 # ==============================================================================
 # Invariantes — garantias que SEMPRE devem se manter
 # ==============================================================================
