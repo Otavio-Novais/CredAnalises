@@ -20,7 +20,11 @@ app = FastAPI(
 # Configuração do CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Em produção, você pode trocar pelo link do seu frontend Heroku
+    allow_origins=[
+        "https://credanalises-frontend.onrender.com",  # URL que o Render vai gerar
+        "http://localhost:8501",  # Streamlit local
+        "http://localhost:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
