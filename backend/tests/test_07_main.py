@@ -168,18 +168,24 @@ def test_get_credit_service_instancia_repo_e_service():
         def __init__(self, repo):
             capturado["repo"] = repo
 
-    monkeypatch = None
+    capturado["db"] = None
     original_repo_class = main_module.SqlCreditRepository
     original_service_class = main_module.CreditService
 
     try:
-        main_module.SqlCreditRepository = lambda db: FakeRepository()
+        def fake_repository_factory(db):
+            capturado["db"] = db
+            return FakeRepository()
+
+        main_module.SqlCreditRepository = fake_repository_factory
         main_module.CreditService = FakeService
 
-        service = main_module.get_credit_service(db=object())
+        db_obj = object()
+        service = main_module.get_credit_service(db=db_obj)
 
         assert isinstance(service, FakeService)
         assert isinstance(capturado["repo"], FakeRepository)
+        assert capturado["db"] is db_obj
     finally:
         main_module.SqlCreditRepository = original_repo_class
         main_module.CreditService = original_service_class

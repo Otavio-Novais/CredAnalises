@@ -93,14 +93,18 @@ def test_sql_credit_repository_mapeia_registros(monkeypatch):
     database_module = load_database_module()
 
     class FakeColumn:
+        def __eq__(self, other):
+            return ("eq", other)
+
         def desc(self):
-            return self
+            return ("desc",)
 
     class FakeSimulacaoORM:
         id = FakeColumn()
         hash_requisicao = FakeColumn()
 
         def __init__(self, **kwargs):
+            self.received_kwargs = dict(kwargs)
             for key, value in kwargs.items():
                 setattr(self, key, value)
             if not hasattr(self, "data_processamento"):
@@ -120,14 +124,20 @@ def test_sql_credit_repository_mapeia_registros(monkeypatch):
     class FakeQuery:
         def __init__(self, result):
             self.result = result
+            self.filter_args = None
+            self.order_by_args = None
+            self.limit_arg = None
 
         def filter(self, *args, **kwargs):
+            self.filter_args = args
             return self
 
         def order_by(self, *args, **kwargs):
+            self.order_by_args = args
             return self
 
         def limit(self, *args, **kwargs):
+            self.limit_arg = args[0] if args else None
             return self
 
         def first(self):
@@ -142,6 +152,8 @@ def test_sql_credit_repository_mapeia_registros(monkeypatch):
             self.committed = False
             self.refreshed = None
             self.query_result = FakeOrmObj()
+            self.last_query_model = None
+            self.last_query = None
 
         def add(self, obj):
             self.added = obj
@@ -153,7 +165,9 @@ def test_sql_credit_repository_mapeia_registros(monkeypatch):
             self.refreshed = obj
 
         def query(self, model):
-            return FakeQuery(self.query_result)
+            self.last_query_model = model
+            self.last_query = FakeQuery(self.query_result)
+            return self.last_query
 
     fake_db = FakeDb()
     repository = database_module.SqlCreditRepository(fake_db)
@@ -167,13 +181,41 @@ def test_sql_credit_repository_mapeia_registros(monkeypatch):
     )
 
     assert fake_db.added is not None
+    assert fake_db.added.nome_proponente == "Renan Momo"
+    assert fake_db.added.status_proposta == "APROVADO"
+    assert fake_db.added.taxa_juros_aplicada == 4.5
+    assert fake_db.added.motivo_decisao == "Aprovado"
+    assert fake_db.added.hash_requisicao == "hash-123"
+    assert fake_db.added.received_kwargs == {
+        "nome_proponente": "Renan Momo",
+        "status_proposta": "APROVADO",
+        "taxa_juros_aplicada": 4.5,
+        "motivo_decisao": "Aprovado",
+        "hash_requisicao": "hash-123",
+    }
     assert fake_db.committed is True
     assert fake_db.refreshed is fake_db.added
     assert registro.nome_proponente == "Renan Momo"
+    assert registro.status_proposta == "APROVADO"
+    assert registro.taxa_juros_aplicada == 4.5
+    assert registro.motivo_decisao == "Aprovado"
+    assert registro.hash_requisicao == "hash-123"
 
     encontrado = repository.buscar_por_hash("hash-123")
+    assert fake_db.last_query_model is FakeSimulacaoORM
+    assert fake_db.last_query.filter_args == (("eq", "hash-123"),)
     assert encontrado.hash_requisicao == "hash-123"
 
     historico = repository.listar_simulacoes(limite=5)
+    assert fake_db.last_query_model is FakeSimulacaoORM
+    assert fake_db.last_query.order_by_args == (("desc",),)
+    assert fake_db.last_query.limit_arg == 5
     assert len(historico) == 1
     assert historico[0].id == 10
+
+    historico_padrao = repository.listar_simulacoes()
+    assert fake_db.last_query_model is FakeSimulacaoORM
+    assert fake_db.last_query.order_by_args == (("desc",),)
+    assert fake_db.last_query.limit_arg == 50
+    assert len(historico_padrao) == 1
+    assert historico_padrao[0].id == 10

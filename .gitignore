@@ -57,6 +57,8 @@ backend/.flake8
 
 # Ferramentas de Mutação e Métricas (Mutmut e Radon)
 backend/.mutmut-cache
+backend/mutants/
+backend/MUTATION_REPORT.md
 # OBS: O 'setup.cfg' e 'requirements.txt' DEVEM ser versionados, então não os ignore.
 
 # ==============================================================================
