@@ -47,7 +47,7 @@ projeto_VDDS/
         ├── app.py (Streamlit app)
         ├── requirements.txt
 ```
-```
+
 
 ## Tecnologias Utilizadas
 
