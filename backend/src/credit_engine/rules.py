@@ -47,8 +47,7 @@ def avaliar_credito(cliente: ClienteSchema) -> str:
 
     # 2. Regra de Decisão Complexa (Alvo do critério MC/DC)
     # Expressão: (A E B) OU (C E D)
-    # Onde:
-    # A = Renda > 5000 | B = Score > 600 | C = Co-garantidor | D = Renda > 3000
+    # Onde:  A = Renda > 5000 | B = Score > 600 | C = Co-garantidor | D = Renda > 3000
 
     
     aprovacao_padrao = (
@@ -118,14 +117,14 @@ def _motivo_aprovacao(cliente: ClienteSchema, padrao: bool, garantidor: bool) ->
     tipo = "Imobiliário" if cliente.tipo_financiamento == "IMOBILIARIO" else "Estudantil"
 
     if padrao and garantidor:
-        return (f"Aprovado por critério padrão (renda R${cliente.renda_mensal:,.2f} "
+        return (f"Aprovado por critério padrão (renda R\$ {cliente.renda_mensal:,.2f} "
                 f"e score {cliente.score_credito}) com co-garantidor adicional. "
                 f"Modalidade: {tipo}.")
     elif padrao:
-        return (f"Aprovado por critério padrão: renda R${cliente.renda_mensal:,.2f} "
-                f"(mínimo R${RENDA_MINIMA_APROVACAO:,.2f}) e score {cliente.score_credito} "
+        return (f"Aprovado por critério padrão: renda R\$ {cliente.renda_mensal:,.2f} "
+                f"(mínimo R\$ {RENDA_MINIMA_APROVACAO:,.2f}) e score {cliente.score_credito} "
                 f"(mínimo {SCORE_MINIMO_APROVACAO}). Modalidade: {tipo}.")
     else:
-        return (f"Aprovado com co-garantidor: renda R${cliente.renda_mensal:,.2f} "
-                f"(mínimo com garantidor R${RENDA_MINIMA_COM_GARANTIDOR:,.2f}). "
+        return (f"Aprovado com co-garantidor: renda R\$ {cliente.renda_mensal:,.2f} "
+                f"(mínimo com garantidor R$ {RENDA_MINIMA_COM_GARANTIDOR:,.2f}). "
                 f"Modalidade: {tipo}.")

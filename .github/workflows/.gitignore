@@ -1,0 +1,43 @@
+# ── Banco de dados local ──────────────────────────────────────────
+# NUNCA sobe pro git — cada ambiente tem o seu
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Ambiente virtual Python ───────────────────────────────────────
+venv/
+.venv/
+env/
+
+# ── Cache Python ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# ── Cobertura de testes ───────────────────────────────────────────
+.coverage
+htmlcov/
+coverage.xml
+
+# ── Mutation testing ─────────────────────────────────────────────
+.mutmut-cache
+
+# ── Variáveis de ambiente (NUNCA sobe — tem senhas) ──────────────
+.env
+.env.*
+!.env.example
+
+# ── IDEs ─────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── Streamlit ────────────────────────────────────────────────────
+.streamlit/secrets.toml
+
+# ── OS ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
