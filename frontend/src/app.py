@@ -5,6 +5,10 @@ import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+# Módulos de autenticação (feature de usuários)
+from auth import auth_ui, auth_api
+from auth.historico_pessoal import tela_meu_historico
+
 TZ_BRAZIL = ZoneInfo("America/Sao_Paulo")
 st.set_page_config(
     page_title="CreditCalc Engine",
@@ -13,8 +17,10 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# Inicializa o estado de autenticação (token e usuário na sessão)
+auth_ui.init_auth_state()
+
 # ── URL base da API ───────────────────────────────────────────────
-# Em desenvolvimento: backend rodando localmente
 API_URL = os.environ.get("API_URL", "http://localhost:8000")
 
 
@@ -24,42 +30,17 @@ API_URL = os.environ.get("API_URL", "http://localhost:8000")
 
 def chamar_api_avaliar(dados: dict) -> dict:
     """
-    Chama POST /api/v1/credit/evaluate e retorna o resultado.
+    Chama POST /api/v1/credit/evaluate, vinculando ao usuário se logado.
 
-    Retorna um dict com:
-        {"ok": True,  "dados": {...}}   → sucesso
-        {"ok": False, "erro": "..."}    → falha de regra ou conexão
+    Se houver token na sessão, a simulação é salva vinculada ao usuário.
+    Se não, roda anônima (vínculo opcional da API).
     """
-    try:
-        response = requests.post(
-            f"{API_URL}/api/v1/credit/evaluate",
-            json=dados,
-            timeout=10,
-        )
-        if response.status_code == 200:
-            return {"ok": True, "dados": response.json()}
-        elif response.status_code == 422:
-            # Erro de validação Pydantic — detalha quais campos falharam
-            detalhes = response.json().get("detail", [])
-            msgs = [f"Campo '{e.get('loc',['?'])[-1]}': {e.get('msg','')}" for e in detalhes]
-            return {"ok": False, "erro": "Dados inválidos:\n" + "\n".join(msgs)}
-        else:
-            return {"ok": False, "erro": f"Erro {response.status_code}: {response.text}"}
-    except requests.exceptions.ConnectionError:
-        return {
-            "ok": False,
-            "erro": (
-                "Não foi possível conectar à API.\n"
-                f"Verifique se o backend está rodando em {API_URL}\n"
-                "Comando: uvicorn credit_engine.main:app --reload --app-dir src"
-            )
-        }
-    except requests.exceptions.Timeout:
-        return {"ok": False, "erro": "A API demorou demais para responder (timeout 10s)."}
+    token = auth_ui.get_token()  # None se não logado
+    return auth_api.avaliar_credito_autenticado(dados, token=token)
 
 
 def chamar_api_historico(limite: int = 50) -> dict:
-    """Chama GET /api/v1/history e retorna a lista de simulações."""
+    """Chama GET /api/v1/history e retorna a lista de simulações (global)."""
     try:
         response = requests.get(
             f"{API_URL}/api/v1/history",
@@ -104,10 +85,7 @@ def exibir_resultado(resultado: dict):
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.metric(
-            label="Status",
-            value=status,
-        )
+        st.metric(label="Status", value=status)
     with col2:
         if taxa is not None:
             st.metric(
@@ -117,17 +95,18 @@ def exibir_resultado(resultado: dict):
             )
         else:
             st.metric(label="Taxa de Juros", value="N/A")
-
     with col3:
         if data:
             try:
                 dt = datetime.fromisoformat(data.replace("Z", "+00:00"))
-                st.metric(label="Processado em", value=dt.strftime("%d/%m/%Y %H:%M"))
+                dt_brasil = dt.astimezone(TZ_BRAZIL)
+                st.metric(label="Processado em", value=dt_brasil.strftime("%d/%m/%Y %H:%M") + " (BRT)")
             except Exception:
                 st.metric(label="Processado em", value=data[:19])
 
-    # Motivo auditável (RF04)
-    st.info(f"**Motivo da decisão:** {motivo}")
+    # Motivo auditável (RF04) — escapa o $ para não virar LaTeX
+    motivo_escapado = motivo.replace("$", "\\$")
+    st.info(f"**Motivo da decisão:** {motivo_escapado}")
 
     if motivo.startswith("[CACHE]"):
         st.caption(
@@ -139,10 +118,16 @@ def badge_status(status: str) -> str:
     return {"APROVADO": "✅", "ANALISE_HUMANA": "⏳", "RECUSADO": "❌"}.get(status, "❓")
 
 
-
 def pagina_simulacao():
     st.title("🏦 Análise de Crédito")
     st.caption("Preencha os dados do proponente para obter o veredito automático.")
+
+    # Aviso se está logado ou anônimo
+    if auth_ui.esta_logado():
+        usuario = auth_ui.get_usuario()
+        st.info(f"👤 Logado como **{usuario['nome']}** — suas simulações ficam salvas em 'Minhas Simulações'.")
+    else:
+        st.caption("💡 Faça login para salvar suas simulações e consultá-las depois.")
 
     with st.form("form_credito", clear_on_submit=False):
 
@@ -153,13 +138,11 @@ def pagina_simulacao():
         with col1:
             nome = st.text_input(
                 "Nome completo",
-                key="input_nome",    
                 placeholder="Ex: João da Silva",
                 help="Mínimo 2 caracteres",
             )
             idade = st.number_input(
                 "Idade",
-                key="input_idade",
                 min_value=0, max_value=130,
                 value=30,
                 help="Elegível entre 18 e 75 anos (RN01)",
@@ -168,7 +151,6 @@ def pagina_simulacao():
         with col2:
             renda_mensal = st.number_input(
                 "Renda Mensal (R$)",
-                key="input_renda",
                 min_value=0.0,
                 value=5500.0,
                 step=500.0,
@@ -177,7 +159,6 @@ def pagina_simulacao():
             )
             score_credito = st.number_input(
                 "Score de Crédito",
-                key="input_score",
                 min_value=0, max_value=1000,
                 value=720,
                 help="0 = Baixo risco de aprovação · 1000 = Excelente",
@@ -190,7 +171,6 @@ def pagina_simulacao():
         with col3:
             possui_nome_sujo = st.checkbox(
                 "⚠️  Possui restrição cadastral (nome sujo)",
-                key="input_nome_sujo",
                 value=False,
                 help="Se marcado, a proposta é recusada automaticamente (RN01)",
             )
@@ -198,7 +178,6 @@ def pagina_simulacao():
         with col4:
             possui_co_garantidor = st.checkbox(
                 "🤝  Possui co-garantidor",
-                key="input_tipo",
                 value=False,
                 help="Co-garantidor permite aprovação com renda a partir de R$ 3.000",
             )
@@ -226,7 +205,6 @@ def pagina_simulacao():
         if not nome or len(nome.strip()) < 2:
             st.error("⚠️ Nome deve ter pelo menos 2 caracteres.")
         else:
-            # Monta o payload no formato camelCase do contrato da API
             payload = {
                 "nome": nome.strip(),
                 "idade": int(idade),
@@ -241,9 +219,10 @@ def pagina_simulacao():
                 resposta = chamar_api_avaliar(payload)
 
             if resposta["ok"]:
-                # Salva no session_state para persistir ao navegar entre páginas
                 st.session_state["ultimo_resultado"] = resposta["dados"]
                 st.session_state["ultimo_payload"]   = payload
+                # Limpa o cache do histórico pessoal para forçar atualização
+                st.session_state.pop("meu_historico", None)
             else:
                 st.error(resposta["erro"])
 
@@ -251,7 +230,6 @@ def pagina_simulacao():
     if "ultimo_resultado" in st.session_state:
         exibir_resultado(st.session_state["ultimo_resultado"])
 
-        # Expander com o JSON bruto — útil para entender o contrato da API
         with st.expander("🔧 Ver JSON enviado e recebido"):
             col_a, col_b = st.columns(2)
             with col_a:
@@ -264,16 +242,15 @@ def pagina_simulacao():
 
 def pagina_historico():
     st.title("📊 Histórico de Simulações")
-    st.caption("Últimas análises processadas pelo motor de crédito.")
+    st.caption("Últimas análises processadas pelo motor de crédito (todas as simulações).")
 
     col_limite, col_refresh = st.columns([3, 1])
     with col_limite:
         limite = st.slider("Quantidade de registros", 5, 100, 20)
     with col_refresh:
-        st.write("")  # espaçamento
+        st.write("")
         atualizar = st.button("🔄 Atualizar", use_container_width=True)
 
-    # Chama a API (sempre que a página carrega ou o botão é clicado)
     if atualizar or "historico_dados" not in st.session_state:
         with st.spinner("Carregando histórico..."):
             resposta = chamar_api_historico(limite=limite)
@@ -289,7 +266,6 @@ def pagina_historico():
         st.info("Nenhuma simulação encontrada. Faça uma análise na aba Simulação.")
         return
 
-    # ── Métricas resumidas ────────────────────────────────────────
     total      = len(dados)
     aprovados  = sum(1 for d in dados if d["status_proposta"] == "APROVADO")
     analise    = sum(1 for d in dados if d["status_proposta"] == "ANALISE_HUMANA")
@@ -303,19 +279,16 @@ def pagina_historico():
 
     st.divider()
 
-    # ── Tabela interativa ─────────────────────────────────────────
     df = pd.DataFrame(dados)
-
-    # Formata colunas para exibição
-    df["status"] = df["status_proposta"].apply(
-        lambda s: f"{badge_status(s)} {s}"
-    )
+    df["status"] = df["status_proposta"].apply(lambda s: f"{badge_status(s)} {s}")
     df["taxa_%"] = df["taxa_juros_aplicada"].apply(
         lambda t: f"{t*100:.2f}%" if t is not None else "—"
     )
-    df["data"] = pd.to_datetime(df["data_processamento"]).dt.strftime("%d/%m/%Y %H:%M")
+    # Converte para horário de Brasília
+    df["data"] = pd.to_datetime(
+        df["data_processamento"], utc=True
+    ).dt.tz_convert("America/Sao_Paulo").dt.strftime("%d/%m/%Y %H:%M")
 
-    # Seleciona e renomeia colunas para exibição
     df_exibir = df[["id","nome_proponente","status","taxa_%","data","motivo_decisao"]].rename(columns={
         "id":               "ID",
         "nome_proponente":  "Proponente",
@@ -329,21 +302,14 @@ def pagina_historico():
         df_exibir,
         use_container_width=True,
         hide_index=True,
-        column_config={
-            "Motivo": st.column_config.TextColumn(width="large"),
-        }
+        column_config={"Motivo": st.column_config.TextColumn(width="large")},
     )
 
-    # Expander com JSON bruto para debug/auditoria
     with st.expander("🔧 Ver dados brutos (JSON)"):
         st.json(dados)
 
 
 def pagina_sobre():
-    """
-    Tela informativa: documenta as regras de negócio implementadas.
-    Serve como referência rápida durante os testes.
-    """
     st.title("📖 Regras de Negócio")
     st.caption("Documentação das regras implementadas no motor de crédito.")
 
@@ -380,18 +346,12 @@ def pagina_sobre():
 # ══════════════════════════════════════════════════════════════════
 
 def sidebar():
-    """
-    Painel lateral fixo com navegação e status da API.
-
-    st.sidebar.* funciona igual aos componentes normais mas
-    renderiza no painel lateral em vez do conteúdo principal.
-    """
     with st.sidebar:
         st.title("CreditCalc")
         st.caption("Motor de Análise de Crédito")
         st.divider()
 
-        # Status da API — checa o /health
+        # Status da API
         api_ok = checar_saude_api()
         if api_ok:
             st.success("🟢 API Online")
@@ -401,13 +361,26 @@ def sidebar():
 
         st.divider()
 
-        # Navegação
-        # st.radio como menu de navegação é o padrão mais simples no Streamlit.
-        # Alternativa mais elaborada: st.navigation (Streamlit >= 1.31)
+        # Widget de autenticação
+        if auth_ui.esta_logado():
+            auth_ui.widget_usuario_sidebar()
+        else:
+            st.info("🔒 Não logado")
+        st.divider()
+
+        # Navegação — muda conforme o login
+        opcoes = ["🔍 Simulação", "📊 Histórico", "📖 Regras"]
+        if auth_ui.esta_logado():
+            # Insere "Minhas Simulações" para usuários logados
+            opcoes.insert(2, "📁 Minhas Simulações")
+        else:
+            opcoes.append("🔐 Login / Cadastro")
+
         pagina = st.radio(
             "Navegação",
-            options=["🔍 Simulação", "📊 Histórico", "📖 Regras"],
+            options=opcoes,
             label_visibility="collapsed",
+            key="nav_menu",
         )
     return pagina
 
@@ -419,9 +392,12 @@ def main():
         pagina_simulacao()
     elif pagina == "📊 Histórico":
         pagina_historico()
+    elif pagina == "📁 Minhas Simulações":
+        tela_meu_historico()
     elif pagina == "📖 Regras":
         pagina_sobre()
-
+    elif pagina == "🔐 Login / Cadastro":
+        auth_ui.tela_login_cadastro()
 
 
 main()
