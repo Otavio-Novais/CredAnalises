@@ -24,13 +24,15 @@ projeto_VDDS/
 │   ├── setup.cfg
 │   ├── src/
 │   │   └── credit_engine/
+│   │       ├── __init__.py
 │   │       ├── constants.py
 │   │       ├── database.py
 │   │       ├── main.py
 │   │       ├── repository.py
 │   │       ├── rules.py
 │   │       ├── schemas.py
-│   │       └── service.py
+│   │       ├── service.py
+│   │       └── user_service.py
 │   └── tests/
 │       ├── conftest.py
 │       ├── test_01_equivalence.py
@@ -38,14 +40,26 @@ projeto_VDDS/
 │       ├── test_03_mcdc.py
 │       ├── test_04_data_flow.py
 │       ├── test_05_state.py
-│       └── test_06_integration.py
+│       ├── test_06_integration.py
+│       ├── test_07_main.py
+│       ├── test_08_database.py
+│       ├── test_09_users_service.py
+│       ├── test_10_users_api.py
+│       ├── test_11_user_linked_simulations_service.py
+│       ├── test_12_user_linked_simulations_api.py
+│       └── test_13_e2e.py
 └── frontend/
     ├── README.md
     ├── Procfile
     ├── venv/ (ambiente virtual)
     └── src/
-        ├── app.py (Streamlit app)
+        ├── app.py (Streamlit app principal)
         ├── requirements.txt
+        └── auth/
+            ├── __init__.py
+            ├── auth_api.py
+            ├── auth_ui.py
+            └── historico_pessoal.py
 ```
 
 
@@ -85,26 +99,83 @@ O motor de crédito trabalha com as seguintes decisões principais:
 - Aprovação automática quando há renda e score suficientes.
 - Aprovação alternativa com co-garantidor.
 - Encaminhamento para análise humana quando o score está em uma faixa intermediária.
-- Cálculo de taxa de juros com base no tipo de financiamento e na faixa de score.
-- Registro de histórico com suporte a idempotência por janela de 60 segundos.
+- Cálculo de taxa de juros com base no tipo de financiamento e na faixa de score:
+  - IMOBILIÁRIO: 10% de taxa base
+  - ESTUDANTIL: 6% de taxa base
+  - Ajustes por score: -1.5% (801+), -0.5% (601-800), +1.0% (401-600), +3.0% (0-400)
+- Registro de histórico com suporte a idempotência por janela de 60 segundos (cache por usuário).
+- **Autenticação de usuários** com tokens JWT-like (Bearer tokens).
+- **Histórico vinculado a usuários** com escopo privado e público.
 
 ## Backend
 
+### Autenticação
+
+A API implementa autenticação baseada em **Bearer tokens**. Cada usuário registrado recebe um token de autenticação que deve ser incluído no header `Authorization` nas requisições autenticadas:
+
+```
+Authorization: Bearer <token>
+```
+
+Os tokens são gerados com SHA256 e associados ao usuário autenticado. Simulações de crédito podem ser realizadas com ou sem autenticação.
+
 ### Endpoints
 
-#### `GET /`
+#### Health & Info
 
-Retorna uma mensagem simples indicando que a API está ativa.
+| Método | Endpoint | Descrição | Autenticação |
+|--------|----------|-----------|---------------|
+| GET | `/` | Verifica se a API está ativa | ❌ |
+| GET | `/health` | Status da aplicação | ❌ |
 
-#### `GET /health`
+#### Gerenciamento de Usuários
 
-Endpoint de saúde da aplicação.
+| Método | Endpoint | Descrição | Autenticação |
+|--------|----------|-----------|---------------|
+| POST | `/api/v1/users/register` | Registra novo usuário (201 Created) | ❌ |
+| POST | `/api/v1/users/login` | Login e obtenção de token | ❌ |
+| GET | `/api/v1/users/me` | Obtém dados do usuário autenticado | ✅ Requerida |
 
-#### `POST /api/v1/credit/evaluate`
+#### Avaliação de Crédito
 
-Avalia uma proposta de crédito.
+| Método | Endpoint | Descrição | Autenticação |
+|--------|----------|-----------|---------------|
+| POST | `/api/v1/credit/evaluate` | Avalia proposta de crédito (idempotente 60s) | 🔓 Opcional |
+| GET | `/api/v1/history` | Histórico de todas as simulações (limite: 100) | ❌ |
+| GET | `/api/v1/users/me/history` | Histórico de simulações do usuário autenticado | ✅ Requerida |
 
-Exemplo de payload:
+**Exemplos de Requisições:**
+
+**POST `/api/v1/users/register`**
+
+```json
+{
+  "username": "joao_silva",
+  "email": "joao@example.com",
+  "password": "senha_segura_123"
+}
+```
+
+**POST `/api/v1/users/login`**
+
+```json
+{
+  "username": "joao_silva",
+  "password": "senha_segura_123"
+}
+```
+
+Resposta:
+```json
+{
+  "access_token": "sha256_hash_token",
+  "token_type": "bearer"
+}
+```
+
+**POST `/api/v1/credit/evaluate`**
+
+Payload (sem autenticação ou com token no header):
 
 ```json
 {
@@ -124,40 +195,88 @@ Resposta esperada:
 {
   "status_proposta": "APROVADO",
   "taxa_juros_aplicada": 0.085,
-  "motivo_decisao": "...",
+  "motivo_decisao": "Renda e score suficientes para aprovação",
   "data_processamento": "2026-07-03T12:00:00Z"
 }
 ```
 
-#### `GET /api/v1/history`
+**GET `/api/v1/users/me/history`**
 
-Retorna o histórico das últimas simulações salvas no banco.
+Retorna apenas as simulações do usuário autenticado:
+
+```json
+{
+  "simulacoes": [
+    {
+      "id": 1,
+      "nome_proponente": "João da Silva",
+      "status_proposta": "APROVADO",
+      "taxa_juros_aplicada": 0.085,
+      "motivo_decisao": "...",
+      "data_processamento": "2026-07-03T12:00:00Z"
+    }
+  ]
+}
+```
 
 ### Modelagem dos Dados
 
 O backend usa Pydantic para validação e serialização dos dados de entrada e saída:
 
-- `ClienteSchema`: dados enviados para análise.
-- `RespostaSchema`: retorno da avaliação.
+**Schemas de Crédito:**
+- `ClienteSchema`: dados enviados para análise (nome, idade, renda, score, etc.).
+- `RespostaSchema`: retorno da avaliação (status, taxa, motivo, data).
 - `SimulacaoRegistradaSchema`: representação de registros salvos no histórico.
+
+**Schemas de Usuário:**
+- `UsuarioRegistroSchema`: dados para registro (username, email, password).
+- `UsuarioLoginSchema`: credenciais de login (username, password).
+- `TokenSchema`: token de autenticação retornado após login.
+- `UsuarioSchema`: dados do usuário autenticado.
 
 ### Persistência
 
-Em ambiente local, o projeto usa SQLite com o arquivo `creditcalc.db`. Em produção, a URL do banco é lida da variável de ambiente `DATABASE_URL`.
+Em ambiente local, o projeto usa SQLite com o arquivo `creditcalc.db`. Em produção, a URL do banco é lida da variável de ambiente `DATABASE_URL` (suporta PostgreSQL).
 
-O repositório SQLAlchemy cria a tabela `simulacoes` com:
+O repositório SQLAlchemy cria a tabela `simulacoes` com os seguintes campos:
 
-- identificador incremental;
-- nome do proponente;
-- status da proposta;
-- taxa aplicada;
-- motivo da decisão;
-- data de processamento;
-- hash da requisição.
+- `id` (PK, auto-increment): identificador incremental
+- `nome_proponente`: nome do proponente
+- `status_proposta`: status (APROVADO, ANALISE_HUMANA, RECUSADO)
+- `taxa_juros_aplicada`: taxa aplicada (nullable)
+- `motivo_decisao`: justificativa da decisão
+- `data_processamento`: timestamp com timezone (UTC)
+- `hash_requisicao`: hash MD5 da requisição (para idempotência)
+- `usuario_id` (nullable, indexed): ID do usuário autenticado (vincula simulação ao usuário)
+
+**Sistema de Idempotência:**
+O sistema gera um hash MD5 da requisição e mantém cache por 60 segundos. Quando autenticado, o hash inclui o `usuario_id`, garantindo isolamento de cache por usuário.
 
 ## Frontend
 
-O frontend está preparado com Vite e React e serve como base para a interface da aplicação. No estado atual do projeto, a tela principal é um placeholder de configuração, então a parte visual ainda está em evolução.
+O frontend é uma aplicação Streamlit interativa que permite simular avaliações de crédito e consultar histórico. A aplicação inclui autenticação integrada e gestão de sessão.
+
+### Estrutura do Frontend
+
+**`app.py`** - Aplicação principal Streamlit com:
+- Interface para entrada de dados de simulação
+- Cartões de resultado coloridos (✅ APROVADO / ⏳ ANALISE_HUMANA / ❌ RECUSADO)
+- Exibição de histórico com filtros
+- Gestão de autenticação (estado de sessão)
+- Conversão de timezone (BRT)
+
+**Módulo `auth/`** - Componentes de autenticação e histórico:
+- `auth_api.py`: Camada de comunicação HTTP com backend (registro, login, requisições autenticadas)
+- `auth_ui.py`: Componentes Streamlit de UI (login/registro em abas, gestão de tokens)
+- `historico_pessoal.py`: Visualização de histórico pessoal do usuário autenticado
+
+### Fluxo de Autenticação
+
+1. Usuário se registra ou faz login pela interface de abas no Streamlit
+2. Token é armazenado em `st.session_state`
+3. Nas requisições subsequentes, o token é incluído no header `Authorization: Bearer <token>`
+4. Simulações vinculadas ao usuário autenticado aparecem em "Minhas Simulações"
+5. Usuários não autenticados ainda podem fazer simulações anônimas
 
 ## Instalação
 
@@ -210,17 +329,39 @@ pytest -v                       # Modo verbose
 
 ## Testes
 
-Os testes automatizados estão organizados por técnica de validação:
+Os testes automatizados estão organizados por técnica de validação e funcionalidade. O projeto inclui **13 arquivos de teste** cobrindo diferentes aspectos:
 
-**Backend:**
-- `test_01_equivalence.py`: classes de equivalência.
-- `test_02_bva.py`: análise de valor limite.
-- `test_03_mcdc.py`: MC/DC.
-- `test_04_data_flow.py`: fluxo de dados.
-- `test_05_state.py`: máquina de estados.
-- `test_06_integration.py`: testes de integração.
-- `test_07_main.py`: integração de rota/HTTP
-- `test_08_database.py`: unitário/componente com fakes
+### Testes de Técnicas de Validação (Motor de Crédito)
+
+- `test_01_equivalence.py`: **Particionamento de Equivalência** - partições válidas/inválidas
+- `test_02_bva.py`: **Análise de Valor Limite** - limites de idade (18, 75), score, renda
+- `test_03_mcdc.py`: **MC/DC** - cobertura completa da lógica booleana complexa
+- `test_04_data_flow.py`: **Fluxo de Dados (Def-Use)** - caminhos de definição e uso em `calcular_taxa_juros()`
+- `test_05_state.py`: **Máquina de Estados** - transições de status (APROVADO → ANALISE_HUMANA → RECUSADO)
+
+### Testes de Integração e API
+
+- `test_06_integration.py`: Testes de integração completa (avaliar → salvar → recuperar)
+- `test_07_main.py`: Testes dos endpoints FastAPI
+- `test_08_database.py`: Unitário/componente da camada ORM e repositório SQL
+
+### Testes de Autenticação e Usuários
+
+- `test_09_users_service.py`: Serviço de usuários (hash de senha, geração de tokens)
+- `test_10_users_api.py`: Endpoints de usuários (`/api/v1/users/*`)
+- `test_11_user_linked_simulations_service.py`: Histórico vinculado a usuários e cache isolado
+- `test_12_user_linked_simulations_api.py`: Endpoint `GET /api/v1/users/me/history`
+
+### Testes End-to-End
+
+- `test_13_e2e.py`: Fluxos completos de ponta a ponta (registro → login → simulação → histórico)
+
+### Infraestrutura de Testes
+
+**`conftest.py`** fornece:
+- `cliente_factory(**overrides)`: Builder para criar clientes de teste com dados customizáveis
+- `cliente_perfeito`: Fixture com dados de cliente ideal
+- `in_memory_service`: Fixture de `CreditService` com repositório em memória para testes isolados
 
 **CI/CD:**
 
@@ -228,25 +369,6 @@ O projeto usa GitHub Actions para validação automática:
 
 - `.github/workflows/backend-ci.yml`: testes do backend (Pytest, Radon, Mutmut).
 - `.github/workflows/frontend-ci.yml`: validação do frontend (Pylint, Flake8, startup test).
-
-## Qualidade e Análise
-
-**Backend:**
-
-```bash
-cd backend
-radon cc src/credit_engine              # Complexidade ciclomática
-mutmut run                              # Testes de mutação
-flake8 src/credit_engine                # Estilo de código
-```
-
-**Frontend:**
-
-```bash
-cd frontend/src
-pylint app.py                           # Análise estática
-flake8 app.py                           # Estilo PEP 8
-```
 
 ## Deployment no Render
 
@@ -278,10 +400,59 @@ O projeto está configurado para deploy automático no Render:
 - Cada serviço tem seu próprio `Procfile` para facilitar o deployment.
 - Em produção no Render, a variável `$PORT` é automaticamente injetada.
 
+## Qualidade de Código e Análise
+
+### Testes de Mutação
+
+O projeto usa **Mutmut** para análise de mutação (mede a efetividade dos testes):
+
+```bash
+cd backend
+mutmut run          # Executa testes de mutação
+mutmut results      # Exibe relatório de mutantes
+```
+
+Configuração em `setup.cfg`:
+- Muta todos os arquivos em `src/credit_engine/`
+- Não limita a testes apenas de linhas cobertas (`mutate_only_covered_lines = False`)
+- Runner customizado para suporte a DI e fixtures
+
+### Relatórios e Métricas
+
+```bash
+cd backend
+
+# Cobertura de testes
+pytest --cov=credit_engine --cov-report=html
+
+# Complexidade ciclomática
+radon cc src/credit_engine
+
+# Análise de manutenibilidade
+radon mi src/credit_engine
+
+# Estilo PEP 8
+flake8 src/credit_engine
+```
+
+## Variáveis de Ambiente
+
+Configure as seguintes variáveis de ambiente conforme necessário:
+
+```bash
+# Backend (opcional)
+DATABASE_URL=postgresql://user:password@localhost/creditdb  # Padrão: SQLite local
+
+# Frontend (opcional)
+API_URL=http://localhost:8000  # URL da API backend
+```
+
 ## Próximos Passos Possíveis
 
-- Adicionar mais testes de integração entre frontend e backend no Streamlit.
-- Implementar persistência em banco de dados relacional (PostgreSQL) em produção.
-- Adicionar autenticação e autorização.
-- Expandir a suite de testes com Selenium para testes end-to-end.
-- Criar dashboard de análise de dados com pandas/plotly no frontend.
+- Implementar refresh tokens e expiração de sessão
+- Adicionar rate limiting para endpoints críticos
+- Implementar permissões e papéis de usuário (admin, analista, cliente)
+- Expandir testes com Selenium para UI end-to-end
+- Criar dashboard de análise de dados com pandas/plotly no frontend
+- Migrar dados para banco de dados relacional com histórico de versões
+- Implementar webhooks para notificações de decisão
