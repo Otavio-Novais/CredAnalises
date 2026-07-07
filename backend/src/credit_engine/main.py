@@ -43,11 +43,10 @@ def startup_event():
     """Cria as tabelas no banco ao iniciar a aplicação."""
     criar_tabelas()
 
-# Cria o repositório em memória para a feature de usuários.
-user_repo = InMemoryUserRepository()
-
-# Cria o serviço de usuários usando o repositório em memória.
-user_service = UserService(user_repo)
+# Cria o serviço de usuários sob demanda para evitar instanciar o repositório
+# durante a importação do módulo, o que interfere na coleta do mutmut.
+user_repo: InMemoryUserRepository | None = None
+user_service: UserService | None = None
 
 # Retorna o serviço de crédito com repositório SQL.
 def get_credit_service(db: Session = Depends(get_db)) -> CreditService:
@@ -56,6 +55,12 @@ def get_credit_service(db: Session = Depends(get_db)) -> CreditService:
 
 # Retorna a instância do serviço de usuários.
 def get_user_service() -> UserService:
+    global user_repo, user_service
+
+    if user_service is None:
+        user_repo = InMemoryUserRepository()
+        user_service = UserService(user_repo)
+
     return user_service
 
 # Recupera o usuário autenticado a partir do token enviado no header.

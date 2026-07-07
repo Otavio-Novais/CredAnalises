@@ -3,7 +3,9 @@ import sys
 from datetime import datetime, timezone
 from types import ModuleType, SimpleNamespace
 
+import pytest
 from fastapi.testclient import TestClient
+from fastapi import HTTPException
 
 from credit_engine.schemas import RespostaSchema
 
@@ -168,7 +170,6 @@ def test_get_credit_service_instancia_repo_e_service():
         def __init__(self, repo):
             capturado["repo"] = repo
 
-    capturado["db"] = None
     original_repo_class = main_module.SqlCreditRepository
     original_service_class = main_module.CreditService
 
@@ -189,3 +190,132 @@ def test_get_credit_service_instancia_repo_e_service():
     finally:
         main_module.SqlCreditRepository = original_repo_class
         main_module.CreditService = original_service_class
+
+
+def test_get_user_service_lazy_init_reutiliza_mesma_instancia():
+    main_module = load_main_module()
+
+    original_repo = main_module.user_repo
+    original_service = main_module.user_service
+
+    try:
+        main_module.user_repo = None
+        main_module.user_service = None
+
+        primeiro = main_module.get_user_service()
+        segundo = main_module.get_user_service()
+
+        assert primeiro is segundo
+    finally:
+        main_module.user_repo = original_repo
+        main_module.user_service = original_service
+
+
+def test_get_user_service_recria_estado_apenas_quando_vazio():
+    main_module = load_main_module()
+
+    original_repo = main_module.user_repo
+    original_service = main_module.user_service
+
+    try:
+        main_module.user_repo = None
+        main_module.user_service = None
+
+        primeiro = main_module.get_user_service()
+        repo_primeiro = main_module.user_repo
+
+        main_module.user_repo = None
+        main_module.user_service = None
+
+        segundo = main_module.get_user_service()
+
+        assert primeiro is not segundo
+        assert repo_primeiro is not None
+        assert main_module.user_repo is not None
+    finally:
+        main_module.user_repo = original_repo
+        main_module.user_service = original_service
+
+
+def test_get_current_user_cobre_caminhos_de_autenticacao():
+    main_module = load_main_module()
+
+    class FakeUser:
+        def __init__(self, user_id):
+            self.id = user_id
+
+    class FakeService:
+        def __init__(self, usuario):
+            self.usuario = usuario
+            self.received_token = None
+
+        def buscar_usuario_por_token(self, token):
+            self.received_token = token
+            return self.usuario
+
+    usuario = FakeUser(10)
+    service = FakeService(usuario)
+
+    with pytest.raises(HTTPException) as excinfo_missing:
+        main_module.get_current_user(authorization=None, service=service)
+
+    assert excinfo_missing.value.status_code == 401
+    assert excinfo_missing.value.detail == "nao autenticado"
+
+    with pytest.raises(HTTPException) as excinfo_invalid:
+        main_module.get_current_user(authorization="Basic abc", service=service)
+
+    assert excinfo_invalid.value.status_code == 401
+    assert excinfo_invalid.value.detail == "token invalido"
+
+    retornado = main_module.get_current_user(authorization="Bearer token-123", service=service)
+    assert retornado is usuario
+    assert service.received_token == "token-123"
+
+    service_sem_usuario = FakeService(None)
+
+    with pytest.raises(HTTPException) as excinfo_not_found:
+        main_module.get_current_user(authorization="Bearer token-inexistente", service=service_sem_usuario)
+
+    assert excinfo_not_found.value.status_code == 401
+    assert excinfo_not_found.value.detail == "nao autenticado"
+
+
+def test_get_optional_current_user_cobre_caminhos_de_autenticacao():
+    main_module = load_main_module()
+
+    class FakeUser:
+        def __init__(self, user_id):
+            self.id = user_id
+
+    class FakeService:
+        def __init__(self, usuario):
+            self.usuario = usuario
+            self.received_token = None
+
+        def buscar_usuario_por_token(self, token):
+            self.received_token = token
+            return self.usuario
+
+    usuario = FakeUser(20)
+    service = FakeService(usuario)
+
+    assert main_module.get_optional_current_user(authorization=None, service=service) is None
+
+    with pytest.raises(HTTPException) as excinfo_invalid:
+        main_module.get_optional_current_user(authorization="Token abc", service=service)
+
+    assert excinfo_invalid.value.status_code == 401
+    assert excinfo_invalid.value.detail == "token invalido"
+
+    retornado = main_module.get_optional_current_user(authorization="Bearer token-456", service=service)
+    assert retornado is usuario
+    assert service.received_token == "token-456"
+
+    service_sem_usuario = FakeService(None)
+
+    with pytest.raises(HTTPException) as excinfo_not_found:
+        main_module.get_optional_current_user(authorization="Bearer token-789", service=service_sem_usuario)
+
+    assert excinfo_not_found.value.status_code == 401
+    assert excinfo_not_found.value.detail == "nao autenticado"
