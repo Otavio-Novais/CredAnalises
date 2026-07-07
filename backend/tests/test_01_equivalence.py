@@ -11,14 +11,10 @@ from tests.conftest import cliente_factory
 from credit_engine.rules import avaliar_credito
 
 
-# 1. Caminho Feliz — Classe Válida Completa
+# 1. Caminho Feliz - Classe válida completa
 
 def test_caminho_feliz_aprovado():
-    """
-    Todas as variáveis na classe válida ótima.
-    Garante que o motor aprova quando tudo está correto.
-    """
-    cliente = cliente_factory()  # defaults perfeitos
+    cliente = cliente_factory()
     resultado = avaliar_credito(cliente)
     assert resultado["status"] == "APROVADO"
 
@@ -26,20 +22,17 @@ def test_caminho_feliz_aprovado():
 # 2. Partições Inválidas — Uma variável inválida por vez
 
 @pytest.mark.parametrize("campo, valor, status_esperado", [
-    # Classe inválida: idade abaixo do mínimo
+    # Idade abaixo do mínimo
     ("idade", 15, "RECUSADO"),
-    # Classe inválida: idade acima do máximo
+    # Idade acima do máximo
     ("idade", 80, "RECUSADO"),
-    # Classe inválida: nome sujo
+    # Nome sujo
     ("possui_nome_sujo", True, "RECUSADO"),
-    # Classe inválida: tipo de financiamento inexistente
+    # Tipo de financiamento inexistente
     ("tipo_financiamento", "AUTOMOVEL", "RECUSADO"),
 ])
 def test_particoes_invalidas_impeditivas(campo, valor, status_esperado):
-    """
-    Garante que cada classe impeditiva individualmente causa recusa.
-    Padrão: só um campo inválido por vez — isolamento da causa.
-    """
+   # Isolamento da causa: só um campo inválido por vez.
     cliente = cliente_factory(**{campo: valor})
     resultado = avaliar_credito(cliente)
     assert resultado["status"] == status_esperado
@@ -79,6 +72,7 @@ def test_particoes_invalidas_impeditivas(campo, valor, status_esperado):
         },
     ),
 ])
+
 def test_particoes_invalidas_retorno_exato(campo, valor, esperado):
     cliente = cliente_factory(**{campo: valor})
     resultado = avaliar_credito(cliente)
@@ -92,15 +86,16 @@ def test_particoes_invalidas_retorno_exato(campo, valor, esperado):
 
 
 @pytest.mark.parametrize("renda, score, co_garantidor, status_esperado", [
-    # Classe válida ótima: renda alta + score alto
+    # Classe válida: renda alta + score alto
     (6000.0, 700, False, "APROVADO"),
-    # Classe limiar: renda suficiente + score baixo → análise humana
+    # Classe limiar: renda suficiente + score baixo = análise humana
     (6000.0, 500, False, "ANALISE_HUMANA"),
-    # Classe válida alternativa: co-garantidor + renda mínima
+    # Classe válida: co-garantidor + renda mínima
     (3500.0, 450, True, "APROVADO"),
     # Classe inválida de crédito: sem garantidor + renda baixa + score baixo
     (2000.0, 300, False, "RECUSADO"),
 ])
+
 def test_classes_de_veredito(renda, score, co_garantidor, status_esperado):
     """
     Testa as classes que determinam o veredito de crédito (RN02).
@@ -153,6 +148,7 @@ def test_classes_de_veredito(renda, score, co_garantidor, status_esperado):
         },
     ),
 ])
+
 def test_classes_de_veredito_retorno_exato(renda, score, co_garantidor, esperado):
     cliente = cliente_factory(
         renda_mensal=renda,
@@ -160,7 +156,6 @@ def test_classes_de_veredito_retorno_exato(renda, score, co_garantidor, esperado
         possui_co_garantidor=co_garantidor,
     )
     assert avaliar_credito(cliente) == esperado
-
 
 def test_classes_de_veredito_retorno_exato_estudantil():
     cliente = cliente_factory(
@@ -196,7 +191,7 @@ def test_classes_de_veredito_nas_fronteiras_críticas(renda, score, co_garantido
 
 @pytest.mark.parametrize("tipo", ["IMOBILIARIO", "ESTUDANTIL"])
 def test_tipos_financiamento_validos(tipo):
-    """Ambos os tipos válidos devem passar pela análise sem recusa por tipo."""
+    #Ambos os tipos válidos devem passar pela análise sem recusa por tipo.
     cliente = cliente_factory(tipo_financiamento=tipo)
     resultado = avaliar_credito(cliente)
     assert resultado["status"] == "APROVADO"
