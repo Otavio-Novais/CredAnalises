@@ -103,6 +103,7 @@ frontend/**/.env.production.local
 *.tmp
 *.temp
 *.log
+*.pyc
 
 # Arquivos de lock (opcional, mas bom para limpar)
 package-lock.json
