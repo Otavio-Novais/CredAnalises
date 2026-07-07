@@ -14,14 +14,7 @@ JANELA_IDEMPOTENCIA_SEGUNDOS = 60
 
 # Implementa os casos de uso da análise de crédito.
 class CreditService:
-    """
-    Serviço principal de análise de crédito.
-
-    Recebe um repositório via construtor (Dependency Injection).
-    Isso é o que permite trocar o repositório nos testes:
-        service = CreditService(InMemoryCreditRepository())  # testes
-        service = CreditService(SqlCreditRepository(db))    # produção
-    """
+    
 
     # Inicializa o serviço com o repositório de simulações.
     def __init__(self, repositorio: CreditRepository):
@@ -29,10 +22,6 @@ class CreditService:
 
     # Avalia uma proposta de crédito com usuário opcional.
     def avaliar_credito(self, cliente: ClienteSchema, usuario_id: Optional[int] = None) -> RespostaSchema:
-        """
-        Caso de uso principal: avaliar uma proposta de crédito.
-        Retorna sempre um RespostaSchema — seja do cache ou recém-calculado.
-        """
         hash_req = self._gerar_hash(cliente, usuario_id=usuario_id)
 
         # Verifica se existe resultado recente equivalente para o mesmo escopo.
@@ -82,13 +71,6 @@ class CreditService:
 
     # Gera um hash determinístico para a requisição no escopo correto.
     def _gerar_hash(self, cliente: ClienteSchema, usuario_id: Optional[int] = None) -> str:
-        """
-        Gera um hash MD5 determinístico dos campos relevantes.
-
-        Para manter compatibilidade com os testes antigos:
-        - usuário anônimo: mantém exatamente o hash antigo
-        - usuário autenticado: adiciona o usuario_id ao payload
-        """
         dados = {
             "nome": cliente.nome,
             "idade": cliente.idade,
@@ -107,11 +89,6 @@ class CreditService:
 
     # Verifica se existe uma resposta recente em cache para o hash.
     def _verificar_idempotencia(self, hash_req: str) -> Optional[RespostaSchema]:
-        """
-        Verifica se existe um resultado recente para este hash.
-        Se sim, retorna o RespostaSchema montado a partir do cache.
-        Se não, retorna None (processamento normal deve ocorrer).
-        """
         registro = self.repositorio.buscar_por_hash(hash_req)
         if registro is None:
             return None

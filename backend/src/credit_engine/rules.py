@@ -1,27 +1,7 @@
-"""
-Este arquivo conterá duas funções principais para isolar as técnicas de teste:
-
-avaliar_credito(cliente): Retorna a string "Aprovado", "Recusado" ou "Análise Humana". 
-É aqui que o Radon vai brilhar. 
-Você vai construir os if/elif/else propositalmente aninhados ou compostos para gerar uma 
-Complexidade Ciclomática mensurável e aplicar a tabela verdade do MC/DC.
-
-calcular_taxa_juros(cliente): Retorna um float. 
-Aqui você aplica o Fluxo de Dados (Def-Clear). 
-A variável taxa_juros_base é instanciada no topo, sofre mutações (descontos por score alto, acréscimos por risco) 
-e é retornada no final.
-"""
-
 from credit_engine.schemas import ClienteSchema
 from credit_engine.constants import *
 
 def avaliar_credito(cliente: ClienteSchema) -> str:
-    """
-    Avalia o status do crédito do cliente baseado nas regras de negócio.
-    Está função foi estruturada para apresentar uma complexidade ciclomática
-    mensurável e isolar a decisão booleana complexa
-    """
-
     # 1. Validações de Fronteira Críticas (Alvos ideais para BVA)
     
     if cliente.tipo_financiamento not in TIPOS_FINANCIAMENTO_VALIDOS:

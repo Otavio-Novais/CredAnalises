@@ -54,10 +54,6 @@ class RespostaSchema(BaseModel):
  
  
 class SimulacaoRegistradaSchema(BaseModel):
-    """
-    Representa uma simulação já salva no banco — inclui o ID gerado.
-    Usado pelo endpoint GET /api/v1/history para retornar o histórico.
-    """
     model_config = ConfigDict(from_attributes=True)
  
     id: int
