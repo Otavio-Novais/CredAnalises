@@ -66,7 +66,7 @@ def tela_login_cadastro():
 
     Usa st.tabs para separar Login e Cadastro em duas abas.
     """
-    st.title("🔐 Acesso ao CreditCalc")
+    st.title("🔐 Acesso ao CERASA")
     st.caption("Faça login para salvar e consultar suas simulações rapidamente.")
 
     aba_login, aba_cadastro = st.tabs(["Entrar", "Criar conta"])

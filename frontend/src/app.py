@@ -11,7 +11,7 @@ from auth.historico_pessoal import tela_meu_historico
 
 TZ_BRAZIL = ZoneInfo("America/Sao_Paulo")
 st.set_page_config(
-    page_title="CreditCalc Engine",
+    page_title="CERASA — CalcEngine de Risco e Análise de Students Aplicantes",
     page_icon="🏦",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -104,9 +104,12 @@ def exibir_resultado(resultado: dict):
             except Exception:
                 st.metric(label="Processado em", value=data[:19])
 
-    # Motivo auditável (RF04) — escapa o $ para não virar LaTeX
-    motivo_escapado = motivo.replace("$", "\\$")
-    st.info(f"**Motivo da decisão:** {motivo_escapado}")
+    # Motivo auditável (RF04)
+    # O Streamlit interpreta "$...$" como LaTeX. Para evitar que "R$ 5.500"
+    # vire fórmula, trocamos "R$" por "R\\$" — uma única barra escapa o
+    # cifrão no markdown do Streamlit sem exibir a barra na tela.
+    motivo_limpo = motivo.replace("R$", "R\\$")
+    st.info(f"**Motivo da decisão:** {motivo_limpo}")
 
     if motivo.startswith("[CACHE]"):
         st.caption(
@@ -119,7 +122,7 @@ def badge_status(status: str) -> str:
 
 
 def pagina_simulacao():
-    st.title("🏦 Análise de Crédito")
+    st.title("🏦 CERASA")
     st.caption("Preencha os dados do proponente para obter o veredito automático.")
 
     # Aviso se está logado ou anônimo
@@ -322,9 +325,25 @@ def pagina_sobre():
 
     st.subheader("RN02 — Política de Veredito")
     col1, col2, col3 = st.columns(3)
-    col1.success("✅ **APROVADO**\nRenda > R$ 5.000 **E** Score > 600\n\n*OU*\n\nCo-garantidor **E** Renda > R$ 3.000")
-    col2.warning("⏳ **ANÁLISE HUMANA**\nNão atingiu aprovação automática mas Score > 400")
-    col3.error("❌ **RECUSADO**\nScore ≤ 400 ou condições impeditivas")
+    with col1:
+        st.success("✅ **APROVADO**")
+        st.markdown("""
+- Renda > R\\$ 5.000 **E** Score > 600
+- **OU**
+- Co-garantidor **E** Renda > R\\$ 3.000
+""")
+    with col2:
+        st.warning("⏳ **ANÁLISE HUMANA**")
+        st.markdown("""
+- Não atingiu aprovação automática
+- Mas possui Score > 400
+""")
+    with col3:
+        st.error("❌ **RECUSADO**")
+        st.markdown("""
+- Score ≤ 400
+- Ou condições impeditivas (RN01)
+""")
 
     st.subheader("RN03 — Taxas Base por Modalidade")
     c1, c2 = st.columns(2)
@@ -347,8 +366,8 @@ def pagina_sobre():
 
 def sidebar():
     with st.sidebar:
-        st.title("CreditCalc")
-        st.caption("Motor de Análise de Crédito")
+        st.title("CERASA")
+        st.caption("CalcEngine de Risco e Análise de Students Aplicantes")
         st.divider()
 
         # Status da API
