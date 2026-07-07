@@ -122,8 +122,11 @@ def badge_status(status: str) -> str:
 
 
 def pagina_simulacao():
-    st.title("🏦 CERASA")
-    st.caption("Preencha os dados do proponente para obter o veredito automático.")
+    col_logo, _ = st.columns([1, 2]) 
+    with col_logo:
+        st.image("images/CERASA_D.png", use_container_width=True)
+    
+    # st.title("🏦 CERASA") 
 
     # Aviso se está logado ou anônimo
     if auth_ui.esta_logado():
@@ -366,9 +369,11 @@ def pagina_sobre():
 
 def sidebar():
     with st.sidebar:
+        st.logo("images/Logo_D.png", icon_image="images/Logo_D.png")
         st.title("CERASA")
         st.caption("CalcEngine de Risco e Análise de Students Aplicantes")
         st.divider()
+        
 
         # Status da API
         api_ok = checar_saude_api()
