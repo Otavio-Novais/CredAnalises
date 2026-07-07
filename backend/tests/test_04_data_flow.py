@@ -1,25 +1,3 @@
-"""
-Teste 04 — Análise de Fluxo de Dados (Def-Use)
-
-Técnica: rastreia o ciclo de vida de uma variável desde sua
-definição (DEF) até cada uso (USE). Garante que não há:
-  - Uso sem definição (variável usada antes de ser inicializada)
-  - Definição sem uso (variável definida mas nunca usada — dead code)
-  - Redefinição inesperada (variável sobrescrita antes do uso previsto)
-
-Variável alvo: `taxa` em calcular_taxa_juros()
-
-Ciclo de vida mapeado:
-  DEF 1: taxa = TAXA_BASE_IMOBILIARIO ou TAXA_BASE_ESTUDANTIL
-  USE 1 (condicional): taxa -= DESCONTO_SCORE_EXCELENTE  (se score >= 801)
-  USE 2 (condicional): taxa -= DESCONTO_SCORE_BOM        (se 601 <= score < 801)
-  USE 3 (condicional): taxa += ACRESCIMO_SCORE_REGULAR   (se 401 <= score < 601)
-  USE 4 (condicional): taxa += ACRESCIMO_SCORE_BAIXO     (se score < 401)
-  USE FINAL: return round(taxa, 4)
-
-Os 4 USEs condicionais são mutuamente exclusivos — apenas um executa.
-"""
-
 import pytest
 from tests.conftest import cliente_factory
 from credit_engine.rules import calcular_taxa_juros
@@ -29,10 +7,7 @@ from credit_engine.constants import (
     ACRESCIMO_SCORE_REGULAR, ACRESCIMO_SCORE_BAIXO,
 )
 
-
-# ==============================================================================
 # Caminhos Def-Use por faixa de score — Modalidade IMOBILIARIO
-# ==============================================================================
 
 def test_fluxo_taxa_base_imobiliario_score_excelente():
     """
