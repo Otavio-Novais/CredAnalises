@@ -1,114 +1,69 @@
 # ==============================================================================
-# 1. VARIÁVEIS DE AMBIENTE E SEGURANÇA (Nunca suba isso!)
+# 1. Variáveis de ambiente e segredos (nunca versionar)
 # ==============================================================================
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 *.pem
 *.key
 credentials.json
 secrets.json
 
 # ==============================================================================
-# 2. ARQUIVOS DO SISTEMA OPERACIONAL E EDITORES
+# 2. Sistema operacional e editores
 # ==============================================================================
 .DS_Store
-.DS_Store?
 ._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 desktop.ini
+*:Zone.Identifier
 
-# IDEs (VS Code, PyCharm, IntelliJ, etc.)
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-*.sln
-*.user
 
 # ==============================================================================
-# 3. BACKEND (Python / FastAPI)
+# 3. Python (backend e frontend)
 # ==============================================================================
 # Ambientes virtuais
-backend/venv/
-backend/.venv/
-backend/env/
-backend/ENV/
+venv/
+.venv/
+env/
+ENV/
 
-# Bytecode e cache do Python
-backend/__pycache__/
-backend/**/*.py[cod]
-backend/*$py.class
+# Bytecode e cache
+__pycache__/
+*.py[cod]
+*$py.class
 
-# Testes e Cobertura (pytest, coverage)
-backend/.pytest_cache/
-backend/coverage/
-backend/.coverage
-backend/htmlcov/
+# Testes e cobertura
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
 
-# Linting e Formatação (Ruff, MyPy, Black, etc.)
-backend/.mypy_cache/
-backend/.ruff_cache/
-backend/.flake8
+# Linting
+.mypy_cache/
+.ruff_cache/
 
-# Ferramentas de Mutação e Métricas (Mutmut e Radon)
-backend/.mutmut-cache
-backend/mutants/
+# Mutação e métricas (Mutmut / Radon)
+.mutmut-cache
+mutants/
 backend/MUTATION_REPORT.md
-# OBS: O 'setup.cfg' e 'requirements.txt' DEVEM ser versionados, então não os ignore.
-
-# Bancos SQLite locais
-backend/creditcalc.db
-backend/newcreditcalc.db
 
 # ==============================================================================
-# 4. FRONTEND (React e Vue - Monorepo)
+# 4. Bancos de dados locais (SQLite)
 # ==============================================================================
-# Dependências (Aplica-se ao host-shell, remote-estudantil e remote-imobiliario)
-frontend/**/node_modules/
-
-# Arquivos de Build / Compilação
-frontend/**/dist/
-frontend/**/build/
-frontend/**/.next/
-frontend/**/out/
-
-# Logs de gerenciamento de pacotes
-frontend/**/npm-debug.log*
-frontend/**/yarn-debug.log*
-frontend/**/yarn-error.log*
-frontend/**/pnpm-debug.log*
-frontend/**/lerna-debug.log*
-
-# Cobertura de testes no frontend
-frontend/**/coverage/
-
-# Arquivos de ambiente específicos do frontend
-frontend/**/.env.local
-frontend/**/.env.development.local
-frontend/**/.env.test.local
-frontend/**/.env.production.local
+*.db
+*.sqlite
+*.sqlite3
 
 # ==============================================================================
-# 5. CI/CD e Diversos
+# 5. Diversos
 # ==============================================================================
-# Cache de ações do GitHub (opcional, mas bom para limpar)
-.github/caches/
-
-# Arquivos temporários gerais
+*.log
 *.tmp
 *.temp
-*.log
-*.pyc
-
-# Arquivos de lock (opcional, mas bom para limpar)
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
-
-# Arquivos de teste e cobertura de testes (opcional, mas bom para limpar)
-.coverage
